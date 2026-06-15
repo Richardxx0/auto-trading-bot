@@ -41,6 +41,23 @@ class Config:
     # 杠杆倍数
     leverage: int = 5
 
+    # ── 风控参数 ────
+    max_open_positions: int = 5
+    trailing_stop_activation_pct: float = 0.03
+    trailing_stop_distance_pct: float = 0.02
+
+    # ── 成交量过滤 ────
+    volume_confirm_enabled: bool = True
+    volume_min_ratio: float = 1.0
+
+    # ── 移动止损 ATR ────
+    trailing_stop_atr_multiplier: float = 1.5
+
+    # ── 熔断与风控 ────
+    max_consecutive_losses: int = 3
+    consecutive_loss_ban_hours: int = 4
+    max_daily_loss_pct: float = 0.03
+
     # ── 币种 → 合约名映射 ────────────────────────────────────
     # Key 为信号中解析出的币名，Value 为 Binance USDT-M 永续合约名
     coin_mapping: dict = field(default_factory=lambda: {

@@ -100,6 +100,46 @@ class ExchangeClient:
 
     # ── 开仓与订单管理 ───────────────────────────────────────
 
+# 止损管理方法
+    def get_open_positions_count(self) -> int:
+        try:
+            positions = self._exch.fetch_positions()
+            return sum(1 for p in positions
+                      if abs(float(p.get("contracts", 0) or p.get("size", 0))) > 0.001)
+        except Exception:
+            return 0
+
+    def place_stop_loss_order(self, symbol: str, qty: float, sl_price: float) -> str | None:
+        try:
+            qty_r = float(self._exch.amount_to_precision(symbol, qty))
+            sl_r = float(self._exch.price_to_precision(symbol, sl_price))
+            order = self._exch.create_order(
+                symbol=symbol, type="STOP_MARKET", side="SELL",
+                amount=qty_r,
+                params={"stopPrice": sl_r, "reduceOnly": True},
+            )
+            return order.get("id")
+        except Exception as exc:
+            print(f"\u635f\u6b62\u6302\u5355\u5931\u8d25 {symbol}: {exc}")
+            return None
+
+    def cancel_all_stop_loss(self, symbol: str) -> bool:
+        try:
+            orders = self._exch.fetch_open_orders(symbol)
+            for o in orders:
+                if o.get("type") == "STOP_MARKET" and o.get("side") == "SELL":
+                    self._exch.cancel_order(id=o["id"], symbol=symbol)
+            return True
+        except Exception:
+            return False
+
+    def fetch_open_interest(self, symbol: str) -> float | None:
+        try:
+            oi = self._exch.fetch_open_interest(symbol)
+            return float(oi.get("openInterestAmount", 0) or 0) if oi else None
+        except Exception:
+            pass
+        return None
     def open_long_market(
         self,
         symbol: str,

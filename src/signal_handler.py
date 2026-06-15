@@ -50,6 +50,8 @@ class SignalHandler:
         # 市场状态缓存（新增）
         # 结构：{ symbol: {"regime": str, "strength": str, "confirm_count": int, "last_update": float} }
         self._market_state_cache: dict[str, dict] = {}
+        self._consecutive_losses = 0
+        self._banned_until = 0.0
 
     def _加载去重记录(self) -> None:
         """从文件加载持久化的去重记录。"""
@@ -229,6 +231,15 @@ class SignalHandler:
         logger.info("【第8步B】开始技术分析（获取K线 + 计算EMA/RSI/ATR）...")
         analysis = self._analyzer.analyze(contract_symbol, self._cfg)
 
+        # 成交量确认
+        if self._cfg.volume_confirm_enabled and not analysis.get("error"):
+            vol_r = analysis.get("vol_ratio", 0)
+            if vol_r < self._cfg.volume_min_ratio:
+                logger.info("【成交量过滤】%s vol=%.2f < 最低要求%.2f，跳过",
+                            contract_symbol, vol_r, self._cfg.volume_min_ratio)
+                self._标记去重(contract_symbol)
+                return
+
         if analysis.get("error"):
             logger.warning(
                 "【第8步B】技术分析失败（%s），降级为市价开仓",
@@ -316,6 +327,12 @@ class SignalHandler:
 
     async def _处理解析后的信号(self, signal: dict, sender: str = "") -> None:
         """处理已解析的信号对象（从第2步开始）。"""
+        # 熔断检查
+        if time.time() < self._banned_until:
+            remaining = (self._banned_until - time.time()) / 3600
+            logger.info("【熔断中】暂停交易，剩余 %.1f 小时", remaining)
+            return
+
         coin = signal["symbol"]
         signal_type = signal["signal_type"]
         msg_price = signal.get("price")
@@ -443,6 +460,15 @@ class SignalHandler:
         # ════════════════════════════════════════════
         logger.info("【第8步B】开始技术分析（获取K线 + 计算EMA/RSI/ATR）...")
         analysis = self._analyzer.analyze(contract_symbol, self._cfg)
+
+        # 成交量确认
+        if self._cfg.volume_confirm_enabled and not analysis.get("error"):
+            vol_r = analysis.get("vol_ratio", 0)
+            if vol_r < self._cfg.volume_min_ratio:
+                logger.info("【成交量过滤】%s vol=%.2f < 最低要求%.2f，跳过",
+                            contract_symbol, vol_r, self._cfg.volume_min_ratio)
+                self._标记去重(contract_symbol)
+                return
 
         if analysis.get("error"):
             logger.warning(

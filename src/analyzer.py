@@ -57,6 +57,7 @@ class TechnicalAnalyzer:
         close_1h = [c[4] for c in ohlcv_1h]
         high_4h  = [c[2] for c in ohlcv_4h]
         low_4h   = [c[3] for c in ohlcv_4h]
+        volume_4h = [c[5] for c in ohlcv_4h]
 
         current_price = close_4h[-1]
         result["current_price"] = current_price
@@ -79,6 +80,11 @@ class TechnicalAnalyzer:
         atr_val = atr[-1]
         atr_pct = atr_val / current_price if current_price > 0 else 0
         result["atr_pct"] = round(atr_pct, 6)
+
+        # --- Volume MA20 ---
+        vol_ma20 = sum(volume_4h[-20:]) / 20 if len(volume_4h) >= 20 else 0
+        vol_ratio = volume_4h[-1] / vol_ma20 if vol_ma20 > 0 else 0
+        result["vol_ratio"] = round(vol_ratio, 2)
 
         # --- 6. 判断趋势 ---
         if ema20_val > ema50_val * 1.005:

@@ -51,11 +51,36 @@ class PositionMonitor:
             trail_dist = self._cfg.trailing_stop_distance_pct
             if pnl_pct < activation or curr_high <= entry:
                 continue
-            new_sl = curr_high * (1 - trail_dist)
+            # ATR-based trailing stop (if configured)
+            if self._cfg.trailing_stop_atr_multiplier > 0:
+                try:
+                    candles = self._exch._exch.fetch_ohlcv(symbol, "4h", 20)
+                    if candles and len(candles) > 15:
+                        highs = [c[2] for c in candles[-15:]]
+                        lows = [c[3] for c in candles[-15:]]
+                        closes = [c[4] for c in candles[-15:]]
+                        trs = []
+                        for i in range(1, len(candles[-15:])):
+                            tr = max(highs[i] - lows[i],
+                                     abs(highs[i] - closes[i-1]),
+                                     abs(lows[i] - closes[i-1]))
+                            trs.append(tr)
+                        atr_val = sum(trs) / len(trs)
+                        new_sl = curr_high - atr_val * self._cfg.trailing_stop_atr_multiplier
+                        logger.info("  ATR距离=%.4f ATR倍数=%.1f 新SL=%.6f",
+                                    atr_val / curr_high,
+                                    self._cfg.trailing_stop_atr_multiplier,
+                                    new_sl)
+                    else:
+                        new_sl = curr_high * (1 - trail_dist)
+                except Exception:
+                    new_sl = curr_high * (1 - trail_dist)
+            else:
+                new_sl = curr_high * (1 - trail_dist)
             self._exch.cancel_all_stop_loss(symbol)
             qty = float(self._exch._exch.amount_to_precision(symbol, abs(size)))
             oid = self._exch.place_stop_loss_order(symbol, qty, new_sl)
             if oid:
-                logger.info("移动止损: %s 新高=%.6f(+%.1f%%) SL=%.6f",
+                logger.info("\u79fb\u52a8\u6b62\u635f: %s \u65b0\u9ad8=%.6f(+%.1f%%) SL=%.6f",
                             symbol, curr_high,
                             (curr_high / entry - 1) * 100, new_sl)
