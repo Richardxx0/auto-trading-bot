@@ -1,0 +1,14 @@
+﻿# Core
+ccxt>=4.0
+telethon>=1.28
+
+# Cryptography (telethon dependency, pinned for safety)
+cryptg>=0.4
+
+# Development / linting (optional)
+# pytest>=7
+# pytest-asyncio>=0.21
+
+# Dashboard
+flask>=2.3
+flask-socketio>=5.3
