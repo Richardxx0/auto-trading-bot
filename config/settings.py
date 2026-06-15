@@ -18,12 +18,16 @@ def _resolve_path(*parts: str) -> str:
 class Config:
     """应用配置数据类，所有字段均有默认值。"""
 
-    # ── Telegram 配置 ─────────────────────────────────────────
-    telegram_api_id: int = 0
+   # ── Telegram 配置 ─────────────────────────────────────────
+   telegram_api_id: int = 0
     telegram_api_hash: str = ""
     telegram_phone: str = ""
-    # 频道用户名（如 @ychan_signal）或 ID；留空则监听所有对话
-    telegram_channel: str = ""
+   # 频道用户名（如 @ychan_signal）或 ID；留空则监听所有对话
+   telegram_channel: str = ""
+ 
+     # ── YSS 网页信号配置 ──────────────────────────────────────
+     yss_email: str = ""
+     yss_password: str = ""
 
     # ── Binance 配置 ──────────────────────────────────────────
     binance_api_key: str = ""
@@ -86,14 +90,14 @@ class Config:
     def is_valid(self) -> bool:
         """检查必填配置项是否已填写。"""
         errors: list[str] = []
-        if not self.telegram_api_id:
-            errors.append("TELEGRAM_API_ID 为必填项")
-        if not self.telegram_api_hash:
-            errors.append("TELEGRAM_API_HASH 为必填项")
         if not self.binance_api_key:
             errors.append("BINANCE_API_KEY 为必填项")
         if not self.binance_secret_key:
             errors.append("BINANCE_SECRET_KEY 为必填项")
+         if not self.yss_email:
+             errors.append("YSS_EMAIL 为必填项")
+         if not self.yss_password:
+             errors.append("YSS_PASSWORD 为必填项")
 
         if errors:
             for e in errors:
@@ -132,6 +136,8 @@ def load_config(env_file: str | None = None) -> Config:
         telegram_api_hash=os.environ.get("TELEGRAM_API_HASH", ""),
         telegram_phone=os.environ.get("TELEGRAM_PHONE", ""),
         telegram_channel=os.environ.get("TELEGRAM_CHANNEL", ""),
+         yss_email=os.environ.get("YSS_EMAIL", ""),
+         yss_password=os.environ.get("YSS_PASSWORD", ""),
         binance_api_key=os.environ.get("BINANCE_API_KEY", ""),
         binance_secret_key=os.environ.get("BINANCE_SECRET_KEY", ""),
         binance_testnet=_env_bool("BINANCE_TESTNET", True),

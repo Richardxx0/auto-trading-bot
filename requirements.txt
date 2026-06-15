@@ -12,3 +12,6 @@ cryptg>=0.4
 # Dashboard
 flask>=2.3
 flask-socketio>=5.3
+
+# Web signal listener (yss-signal.com polling)
+aiohttp>=3.9

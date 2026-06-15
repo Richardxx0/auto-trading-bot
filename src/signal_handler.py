@@ -51,6 +51,20 @@ class SignalHandler:
         except Exception as exc:
             logger.exception("信号处理器未捕获的错误: %s", exc)
 
+
+    async def on_web_signal(self, symbol: str, price: float) -> None:
+        """网页监听器的回调入口。"
+        try:
+            # 构造解析后的信号结构（省去第1步自然语言解析）
+            signal = {
+                "symbol": symbol.upper().strip(),
+                "signal_type": "LONG",
+                "price": price,
+            }
+            await self._处理解析后的信号(signal, "yss-signal.com")
+        except Exception as exc:
+            logger.exception("信号处理器未捕获的错误: %s", exc)
+
     async def _处理信号(self, sender: str, text: str) -> None:
         # ════════════════════════════════════════════
         # 第1步：解析信号
@@ -253,6 +267,201 @@ class SignalHandler:
         self._dedup.add(contract_symbol)
 
     # ── 市场状态稳定确认（新增） ─────────────────────────────
+
+
+    async def _处理解析后的信号(self, signal: dict, sender: str = "") -> None:
+        """处理已解析的信号对象（从第2步开始）。"""
+        coin = signal["symbol"]
+        signal_type = signal["signal_type"]
+        msg_price = signal.get("price")
+
+        logger.info("=" * 56)
+        logger.info("【第1步跳过】收到信号: 币种=%s 类型=%s 来源=%s",
+                     coin, signal_type, sender)
+        if msg_price:
+            logger.info("  入场价: %.6f", msg_price)
+
+        # ════════════════════════════════════════════
+        # 第2步：检查信号类型
+        # ════════════════════════════════════════════
+        if signal_type.upper() != "LONG":
+            logger.info("【第2步】信号类型 '%s' 暂不支持，跳过", signal_type)
+            return
+        logger.info("【第2步】信号类型检查通过: LONG")
+
+        # ════════════════════════════════════════════
+        # 第3步：币种映射
+        # ════════════════════════════════════════════
+        contract_symbol = self._cfg.coin_mapping.get(coin)
+        if contract_symbol is None:
+            logger.warning("【第3步】未找到币种 '%s' 的合约映射，跳过", coin)
+            return
+        logger.info("【第3步】映射 %s -> %s", coin, contract_symbol)
+
+        # ════════════════════════════════════════════
+        # 第4步：内存去重
+        # ════════════════════════════════════════════
+        if contract_symbol in self._dedup:
+            logger.info("【第4步】合约 %s 在本轮会话中已处理过，跳过", contract_symbol)
+            return
+        logger.info("【第4步】内存去重通过")
+
+        # ════════════════════════════════════════════
+        # 第5步：检查合约存在
+        # ════════════════════════════════════════════
+        if not self._exchange.contract_exists(contract_symbol):
+            logger.warning("【第5步】合约 %s 在 Binance 合约市场不存在，跳过", contract_symbol)
+            return
+        logger.info("【第5步】合约存在检查通过")
+
+        # ════════════════════════════════════════════
+        # 第6步：检查持仓
+        # ════════════════════════════════════════════
+        if self._exchange.has_open_position(contract_symbol):
+            logger.info("【第6步】合约 %s 已有持仓，跳过重复开仓", contract_symbol)
+            self._dedup.add(contract_symbol)
+            return
+        logger.info("【第6步】持仓检查通过（无持仓）")
+
+        # ════════════════════════════════════════════
+        # 第7步：获取余额
+        # ════════════════════════════════════════════
+        balance = self._exchange.get_balance_usdt()
+        if balance <= 0:
+            logger.error("【第7步】账户余额为 0 或获取失败，中止")
+            return
+        logger.info("【第7步】账户余额: %.2f USDT", balance)
+
+        # ════════════════════════════════════════════
+        # 第8步A：市场状态分类
+        # ════════════════════════════════════════════
+        logger.info("【第8步A】开始市场状态分类（获取4hK线 + ADX + ATR比值）...")
+        regime_result = self._analyzer.classify_regime(contract_symbol, self._cfg)
+        raw_regime = regime_result["regime"]
+        raw_strength = regime_result["strength"]
+
+        logger.info(
+            "【第8步A】原始市场状态: %s  强度=%s  ADX=%s  ATR比值=%s  EMA发散=%.2f%%",
+            raw_regime, raw_strength,
+            regime_result.get("adx", "N/A"),
+            regime_result.get("atr_ratio", "N/A"),
+            regime_result.get("ema_spread_pct", 0),
+        )
+
+        if regime_result.get("adx") is None:
+            logger.warning("【第8步A】ADX数据不足，状态分类可能不准确")
+
+        # ════════════════════════════════════════════
+        # 第8步A+：市场状态稳定确认（新增）
+        # ════════════════════════════════════════════
+        confirmed_state = self._确认市场状态(
+            contract_symbol, raw_regime, raw_strength,
+        )
+
+        if confirmed_state is None:
+            logger.warning(
+                "【第8步A+】市场状态未稳定（confirm < 2），跳过本次交易",
+            )
+            self._dedup.add(contract_symbol)
+            return
+
+        # 使用稳定后的状态进行后续风控
+        regime = confirmed_state["regime"]
+        regime_strength = confirmed_state["strength"]
+        confirm_count = confirmed_state["confirm_count"]
+
+        logger.info(
+            "【第8步A+】市场状态已稳定: %s  强度=%s  confirm=%d",
+            regime, regime_strength, confirm_count,
+        )
+
+        # ════════════════════════════════════════════
+        # 第8步B：技术分析
+        # ════════════════════════════════════════════
+        logger.info("【第8步B】开始技术分析（获取K线 + 计算EMA/RSI/ATR）...")
+        analysis = self._analyzer.analyze(contract_symbol, self._cfg)
+
+        if analysis.get("error"):
+            logger.warning(
+                "【第8步B】技术分析失败（%s），降级为市价开仓",
+                analysis["error"],
+            )
+            await self._执行市价开仓(contract_symbol, msg_price, balance)
+            self._dedup.add(contract_symbol)
+            return
+
+        entry_zone = analysis["entry_zone"]
+        current_price = analysis.get("current_price", 0)
+
+        logger.info(
+            "【第8步B】技术分析: 趋势=%s RSI=%s 入场评级=%s",
+            analysis.get("trend", "?"),
+            analysis.get("rsi", "?"),
+            entry_zone,
+        )
+
+        # ════════════════════════════════════════════
+        # 风控联动（基于稳定后的市场状态）
+        # ════════════════════════════════════════════
+        risk_multiplier = 1.0
+
+        if regime == "RANGING":
+            logger.info(
+                "【风控联动】震荡行情（稳定状态）→ 禁止追涨，强制使用限价单",
+            )
+            entry_zone = "poor"
+            if analysis.get("limit_price") is None or analysis["limit_price"] <= 0:
+                analysis["limit_price"] = current_price * 0.995
+                logger.info(
+                    "【风控联动】震荡行情限价设为: %.8f（市价下方0.5%%）",
+                    analysis["limit_price"],
+                )
+
+        elif regime == "VOLATILE":
+            risk_multiplier = 0.5
+            logger.info(
+                "【风控联动】高波动行情（稳定状态）→ 仓位减半（乘数=%.1f）",
+                risk_multiplier,
+            )
+
+        elif regime == "TRENDING":
+            logger.info(
+                "【风控联动】趋势行情（稳定状态）→ 允许市价单，强度=%s",
+                regime_strength,
+            )
+
+        # ════════════════════════════════════════════
+        # 第9步：决策执行
+        # ════════════════════════════════════════════
+        if entry_zone in ("good", "ok"):
+            logger.info("【第9步】入场评级=%s → 市价开多", entry_zone)
+            await self._执行市价开仓(
+                contract_symbol, msg_price, balance, risk_multiplier,
+            )
+
+        elif entry_zone == "poor":
+            limit_price = analysis.get("limit_price")
+            if limit_price is None or limit_price <= 0:
+                logger.warning(
+                    "【第9步】入场评级=poor 但无有效限价，降级为市价开仓",
+                )
+                await self._执行市价开仓(
+                    contract_symbol, msg_price, balance, risk_multiplier,
+                )
+            else:
+                logger.info(
+                    "【第9步】入场评级=poor → 挂限价单 %.8f （当前价 %.8f）",
+                    limit_price, current_price,
+                )
+                await self._执行限价开仓(
+                    contract_symbol, limit_price, msg_price,
+                    balance, risk_multiplier,
+                )
+
+        else:
+            logger.warning("【第9步】入场评级=%s 未知，跳过", entry_zone)
+
+        self._dedup.add(contract_symbol)
 
     def _确认市场状态(
         self,

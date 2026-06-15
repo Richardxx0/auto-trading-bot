@@ -12,7 +12,7 @@ import signal
 import sys
 
 from config.settings import load_config
-from src.telegram_listener import TelegramListener
+from src.web_listener import WebSignalListener
 from src.signal_handler import SignalHandler
 
 
@@ -64,7 +64,11 @@ async def 主异步函数() -> None:
     log.info("=" * 56)
 
     handler = SignalHandler(cfg)
-    listener = TelegramListener(cfg, on_message=handler.on_telegram_message)
+    listener = WebSignalListener(
+        email=cfg.yss_email,
+        password=cfg.yss_password,
+        on_signal_callback=handler.on_web_signal,
+    )
 
     # 优雅关闭处理
     关闭事件 = asyncio.Event()
