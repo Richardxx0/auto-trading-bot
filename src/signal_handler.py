@@ -240,7 +240,7 @@ class SignalHandler:
         if entry_zone in ("good", "ok"):
             logger.info("【第9步】入场评级=%s → 市价开多", entry_zone)
             await self._执行市价开仓(
-                contract_symbol, msg_price, balance, risk_multiplier,
+                contract_symbol, msg_price, balance, risk_multiplier, analysis,
             )
 
         elif entry_zone == "poor":
@@ -250,7 +250,7 @@ class SignalHandler:
                     "【第9步】入场评级=poor 但无有效限价，降级为市价开仓",
                 )
                 await self._执行市价开仓(
-                    contract_symbol, msg_price, balance, risk_multiplier,
+                    contract_symbol, msg_price, balance, risk_multiplier, analysis,
                 )
             else:
                 logger.info(
@@ -438,7 +438,7 @@ class SignalHandler:
         if entry_zone in ("good", "ok"):
             logger.info("【第9步】入场评级=%s → 市价开多", entry_zone)
             await self._执行市价开仓(
-                contract_symbol, msg_price, balance, risk_multiplier,
+                contract_symbol, msg_price, balance, risk_multiplier, analysis,
             )
 
         elif entry_zone == "poor":
@@ -448,7 +448,7 @@ class SignalHandler:
                     "【第9步】入场评级=poor 但无有效限价，降级为市价开仓",
                 )
                 await self._执行市价开仓(
-                    contract_symbol, msg_price, balance, risk_multiplier,
+                    contract_symbol, msg_price, balance, risk_multiplier, analysis,
                 )
             else:
                 logger.info(
@@ -543,6 +543,7 @@ class SignalHandler:
         msg_price: float | None,
         balance: float,
         risk_multiplier: float = 1.0,
+        analysis: dict | None = None,
     ) -> None:
         """获取入场价 → 计算仓位（×风险乘数）→ 市价开多 → 止盈止损。"""
         if msg_price and msg_price > 0:
@@ -555,6 +556,7 @@ class SignalHandler:
                 return
             logger.info("  使用实时市场价格作为入场价: %.8f", entry_price)
 
+        # 先计算仓位（始终需要 risk_manager）
         risk_result = self._risk.calculate(
             balance_usdt=balance,
             entry_price=entry_price,
@@ -562,7 +564,20 @@ class SignalHandler:
         )
         raw_qty = risk_result["qty"]
         sl_price = risk_result["sl"]
-        tp_price = risk_result["tp"]
+
+        # 再用分析结果中的动态 SL/TP 覆盖（如果有）
+        if analysis and analysis.get("sl_price") and analysis.get("tp_levels"):
+            sl_price = analysis["sl_price"]
+            tp_levels = analysis["tp_levels"]
+            logger.info("  使用动态SL/TP（基于ATR）: SL=%.8f  TP=%s",
+                        sl_price,
+                        ", ".join(f"{l[chr(39)+chr(108)+chr(97)+chr(98)+chr(101)+chr(108)+chr(39)]}={l[chr(39)+chr(112)+chr(114)+chr(105)+chr(99)+chr(101)+chr(39)]}"
+                                  for l in tp_levels))
+        else:
+            # 无分析数据时，退回到固定 TP
+            tp_levels = [{"price": risk_result["tp"], "qty_pct": 1.0, "label": "TP"}]
+            logger.info("  使用固定SL/TP: SL=%.8f TP=%.8f",
+                        sl_price, risk_result["tp"])
 
         if raw_qty <= 0:
             logger.warning("  计算出的数量为 0，中止")
@@ -582,7 +597,7 @@ class SignalHandler:
             symbol=symbol,
             quantity=qty,
             stop_loss_price=sl_price,
-            take_profit_price=tp_price,
+            tp_levels=tp_levels,
         )
 
         if "error" in result and result["error"]:
@@ -618,14 +633,25 @@ class SignalHandler:
         """挂限价买入单 → 后台监控 → 成交后设止盈止损。"""
         entry_price = limit_price
 
-        risk_result = self._risk.calculate(
-            balance_usdt=balance,
-            entry_price=entry_price,
-            direction="BUY",
-        )
-        raw_qty = risk_result["qty"]
-        sl_price = risk_result["sl"]
-        tp_price = risk_result["tp"]
+        # 优先使用分析结果中的动态 SL/TP，否则回退到固定百分比
+        if analysis and analysis.get("sl_price") and analysis.get("tp_levels"):
+            sl_price = analysis["sl_price"]
+            tp_levels = analysis["tp_levels"]
+            logger.info("  使用动态SL/TP（基于ATR）: SL=%.8f  TP=%s",
+                        sl_price,
+                        ", ".join(f"{l['label']}={l['price']}"
+                                  for l in tp_levels))
+        else:
+            risk_result = self._risk.calculate(
+                balance_usdt=balance,
+                entry_price=entry_price,
+                direction="BUY",
+            )
+            sl_price = risk_result["sl"]
+            # 无分析数据时，退回到单个固定 TP
+            tp_levels = [{"price": risk_result["tp"], "qty_pct": 1.0, "label": "TP"}]
+            logger.info("  使用固定SL/TP（分析数据不可用）: SL=%.8f TP=%.8f",
+                        sl_price, risk_result["tp"])
 
         if raw_qty <= 0:
             logger.warning("  计算出的数量为 0，中止限价开仓")

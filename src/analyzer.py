@@ -107,12 +107,36 @@ class TechnicalAnalyzer:
             limit_price = max(limit_price, current_price * 0.90)
             result["limit_price"] = round(limit_price, 10)
 
+        # --- 10. 动态止损止盈（基于 ATR） ---
+        if atr_pct > 0:
+            sl_mult = 1.5
+            result["sl_price"] = round(current_price * (1 - atr_pct * sl_mult), 10)
+            result["sl_pct"] = round(atr_pct * sl_mult * 100, 4)
+ 
+             # 分批止盈：三个阶梯
+            result["tp_levels"] = [
+                 {"price": round(current_price * (1 + atr_pct * 2.0), 10),
+                 "qty_pct": 0.5, "label": "TP1"},
+                 {"price": round(current_price * (1 + atr_pct * 3.0), 10),
+                 "qty_pct": 0.3, "label": "TP2"},
+                 {"price": round(current_price * (1 + atr_pct * 4.5), 10),
+                 "qty_pct": 0.2, "label": "TP3"},
+             ]
+        else:
+            result["sl_price"] = None
+            result["tp_levels"] = []
+ 
         logger.info(
             "技术分析完成: %s 趋势=%s RSI=%.1f EMA20=%.8f "
-            "price_vs_EMA20=%.2f%% atr=%.4f%% 入场评级=%s 限价=%.8f",
+            "price_vs_EMA20=%.2f%% atr=%.4f%% 入场评级=%s 限价=%.8f "
+            "动态SL=%s TP1=%s TP2=%s TP3=%s",
             symbol, trend, rsi_val, ema20_val,
             price_vs_ema20_pct, atr_pct * 100, entry_zone,
             result.get("limit_price") or 0,
+            result.get("sl_price") or "N/A",
+            result["tp_levels"][0]["price"] if result.get("tp_levels") else "N/A",
+            result["tp_levels"][1]["price"] if len(result.get("tp_levels", [])) > 1 else "N/A",
+            result["tp_levels"][2]["price"] if len(result.get("tp_levels", [])) > 2 else "N/A",
         )
 
         return result

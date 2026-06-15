@@ -105,11 +105,11 @@ class ExchangeClient:
         symbol: str,
         quantity: float,
         stop_loss_price: float,
-        take_profit_price: float,
+        tp_levels: list[dict],
     ) -> dict[str, Any]:
         """市价开多，成交后自动挂止盈止损单。"""
         results: dict[str, Any] = {
-            "entry": None, "stop_loss": None, "take_profit": None,
+            "entry": None, "stop_loss": None, "take_profits": [],
         }
 
         self.set_leverage(symbol, self._cfg.leverage)
@@ -137,7 +137,7 @@ class ExchangeClient:
             return results
 
         # 成交后挂止盈止损
-        self._挂止盈止损(symbol, qty, stop_loss_price, take_profit_price, results)
+        self._挂止盈止损(symbol, qty, stop_loss_price, tp_levels, results)
 
         return results
 
@@ -204,11 +204,11 @@ class ExchangeClient:
         take_profit_price: float,
     ) -> dict[str, Any]:
         """对已有持仓挂止盈止损单（reduced-only）。"""
-        results: dict[str, Any] = {"stop_loss": None, "take_profit": None}
+        results: dict[str, Any] = {"stop_loss": None, "take_profits": []}
 
         qty = float(self._exch.amount_to_precision(symbol, quantity))
 
-        self._挂止盈止损(symbol, qty, stop_loss_price, take_profit_price, results)
+        self._挂止盈止损(symbol, qty, stop_loss_price, tp_levels, results)
         return results
 
     # ── 资金费率 ──────────────────────────────────────────────
@@ -231,10 +231,13 @@ class ExchangeClient:
         symbol: str,
         qty: float,
         sl_price: float,
-        tp_price: float,
+        tp_levels: list[dict],
         results: dict,
     ) -> None:
-        """向 *results* 字典写入止盈止损挂单结果。"""
+        """挂止盈止损单，tp_levels 支持分批止盈。
+
+        tp_levels: [{"price": ..., "qty_pct": 0.5}, ...]
+        """
         # 止损
         if sl_price > 0:
             try:
@@ -252,22 +255,37 @@ class ExchangeClient:
             except Exception as exc:
                 logger.error("止损挂单失败 %s: %s", symbol, exc)
 
-        # 止盈
-        if tp_price > 0:
-            try:
-                tp_rounded = float(self._exch.price_to_precision(symbol, tp_price))
-                tp_order = self._exch.create_order(
-                    symbol=symbol,
-                    type="TAKE_PROFIT_MARKET",
-                    side="SELL",
-                    amount=qty,
-                    params={"stopPrice": tp_rounded, "reduceOnly": True},
-                )
-                results["take_profit"] = tp_order
-                logger.info(">>> 止盈挂单成功: 价格=%s 订单号=%s",
-                            tp_rounded, tp_order.get("id", "N/A"))
-            except Exception as exc:
-                logger.error("止盈挂单失败 %s: %s", symbol, exc)
+        # 分批止盈（支持多个 TP 价格，每个挂部分仓位）
+        if tp_levels:
+            results["take_profits"] = []
+            for level in tp_levels:
+                tp_price = level["price"]
+                tp_qty_pct = level["qty_pct"]
+                tp_label = level.get("label", "TP")
+                if tp_price <= 0 or tp_qty_pct <= 0:
+                    continue
+                tp_qty = qty * tp_qty_pct
+                tp_qty = float(self._exch.amount_to_precision(symbol, tp_qty))
+                if tp_qty <= 0:
+                    logger.warning("  %s 舍入后数量为0，跳过", tp_label)
+                    continue
+                try:
+                    tp_rounded = float(self._exch.price_to_precision(symbol, tp_price))
+                    tp_order = self._exch.create_order(
+                        symbol=symbol,
+                        type="TAKE_PROFIT_MARKET",
+                        side="SELL",
+                        amount=tp_qty,
+                        params={"stopPrice": tp_rounded, "reduceOnly": True},
+                    )
+                    results["take_profits"].append(tp_order)
+                    logger.info(">>> %s 止盈挂单成功: 价格=%s 数量=%s(%d%%) 订单号=%s",
+                                tp_label, tp_rounded, tp_qty,
+                                int(tp_qty_pct * 100),
+                                tp_order.get("id", "N/A"))
+                except Exception as exc:
+                    logger.error("%s 止盈挂单失败 %s (price=%s): %s",
+                                tp_label, symbol, tp_price, exc)
 
     def _构建交易所(self) -> ccxt.binanceusdm:
         exch = ccxt.binanceusdm({
