@@ -52,14 +52,15 @@ class SignalHandler:
             logger.exception("信号处理器未捕获的错误: %s", exc)
 
 
-    async def on_web_signal(self, symbol: str, price: float) -> None:
-        """网页监听器的回调入口。"
+    async def on_web_signal(self, symbol: str, price: float, alert_count: int = 1) -> None:
+        """网页监听器的回调入口。"""
         try:
             # 构造解析后的信号结构（省去第1步自然语言解析）
             signal = {
                 "symbol": symbol.upper().strip(),
                 "signal_type": "LONG",
                 "price": price,
+                "alert_count": alert_count,
             }
             await self._处理解析后的信号(signal, "yss-signal.com")
         except Exception as exc:
@@ -274,10 +275,11 @@ class SignalHandler:
         coin = signal["symbol"]
         signal_type = signal["signal_type"]
         msg_price = signal.get("price")
+        alert_count = signal.get("alert_count", 0)
 
         logger.info("=" * 56)
-        logger.info("【第1步跳过】收到信号: 币种=%s 类型=%s 来源=%s",
-                     coin, signal_type, sender)
+        logger.info("【第1步跳过】收到信号: 币种=%s 类型=%s 第%d次报警 来源=%s",
+                     coin, signal_type, alert_count, sender)
         if msg_price:
             logger.info("  入场价: %.6f", msg_price)
 
