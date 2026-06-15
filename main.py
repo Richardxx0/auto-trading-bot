@@ -13,6 +13,7 @@ import sys
 
 from config.settings import load_config
 from src.web_listener import WebSignalListener
+from src.position_monitor import PositionMonitor
 from src.signal_handler import SignalHandler
 
 
@@ -69,6 +70,7 @@ async def 主异步函数() -> None:
         password=cfg.yss_password,
         on_signal_callback=handler.on_web_signal,
     )
+    monitor = PositionMonitor(handler._exchange, cfg)
 
     # 优雅关闭处理
     关闭事件 = asyncio.Event()
@@ -88,14 +90,16 @@ async def 主异步函数() -> None:
     try:
         # 并发运行监听器和关闭等待
         监听任务 = asyncio.create_task(listener.start())
+        监控任务 = asyncio.create_task(monitor.start())
         await asyncio.wait(
-            [监听任务, asyncio.create_task(关闭事件.wait())],
+            [监听任务, 监控任务, asyncio.create_task(关闭事件.wait())],
             return_when=asyncio.FIRST_COMPLETED,
         )
     except Exception as exc:
         log.exception("未捕获的错误: %s", exc)
     finally:
         await listener.stop()
+        monitor.stop()
         log.info("机器人已停止")
 
 

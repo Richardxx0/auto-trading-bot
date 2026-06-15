@@ -16,7 +16,9 @@
   第9步  决策执行
 """
 import asyncio
+import json
 import logging
+import os
 import time
 
 from config.settings import Config
@@ -39,10 +41,35 @@ class SignalHandler:
         self._risk = RiskManager(config)
         self._analyzer = TechnicalAnalyzer(self._exchange)
         self._dedup: set[str] = set()
+        self._dedup_file = os.path.join(
+            os.path.dirname(os.path.dirname(os.path.abspath(__file__))),
+            "dedup.json",
+        )
+        self._加载去重记录()
 
         # 市场状态缓存（新增）
         # 结构：{ symbol: {"regime": str, "strength": str, "confirm_count": int, "last_update": float} }
         self._market_state_cache: dict[str, dict] = {}
+
+    def _加载去重记录(self) -> None:
+        """从文件加载持久化的去重记录。"""
+        try:
+            with open(self._dedup_file, "r") as f:
+                data = json.load(f)
+                if isinstance(data, dict):
+                    self._dedup = set(data.keys())
+                    logger.info("已加载 %d 条去重记录", len(self._dedup))
+        except (FileNotFoundError, json.JSONDecodeError):
+            self._dedup = set()
+
+    def _标记去重(self, symbol: str) -> None:
+        """标记合约已处理，持久化到文件。"""
+        self._dedup.add(symbol)
+        try:
+            with open(self._dedup_file, "w") as f:
+                json.dump({s: time.time() for s in self._dedup}, f, indent=2)
+        except Exception as exc:
+            logger.warning("去重记录保存失败: %s", exc)
 
     async def on_telegram_message(self, sender: str, text: str) -> None:
         """Telegram 监听器的回调入口。"""
@@ -98,8 +125,13 @@ class SignalHandler:
         # ════════════════════════════════════════════
         contract_symbol = self._cfg.coin_mapping.get(coin)
         if contract_symbol is None:
-            logger.warning("【第3步】未找到币种 '%s' 的合约映射，跳过", coin)
-            return
+            auto_sym = f"{coin}USDT"
+            if self._exchange.contract_exists(auto_sym):
+                contract_symbol = auto_sym
+                logger.info("【第3步】自动映射 %s -> %sUSDT", coin, coin)
+            else:
+                logger.warning("【第3步】未找到币种 '%s' 的合约映射，跳过", coin)
+                return
         logger.info("【第3步】映射 %s -> %s", coin, contract_symbol)
 
         # ════════════════════════════════════════════
@@ -123,7 +155,7 @@ class SignalHandler:
         # ════════════════════════════════════════════
         if self._exchange.has_open_position(contract_symbol):
             logger.info("【第6步】合约 %s 已有持仓，跳过重复开仓", contract_symbol)
-            self._dedup.add(contract_symbol)
+            self._标记去重(contract_symbol)
             return
         logger.info("【第6步】持仓检查通过（无持仓）")
 
@@ -135,6 +167,18 @@ class SignalHandler:
             logger.error("【第7步】账户余额为 0 或获取失败，中止")
             return
         logger.info("【第7步】账户余额: %.2f USDT", balance)
+
+        # ════════════════════════════════════════════
+        # 风控：检查最大持仓数
+        # ════════════════════════════════════════════
+        open_count = self._exchange.get_open_positions_count()
+        if open_count >= self._cfg.max_open_positions:
+            logger.info(
+                "【风控】已达最大持仓数 %d/%d，跳过 %s",
+                open_count, self._cfg.max_open_positions, contract_symbol,
+            )
+            self._标记去重(contract_symbol)
+            return
 
         # ════════════════════════════════════════════
         # 第8步A：市场状态分类
@@ -166,7 +210,7 @@ class SignalHandler:
             logger.warning(
                 "【第8步A+】市场状态未稳定（confirm < 2），跳过本次交易",
             )
-            self._dedup.add(contract_symbol)
+            self._标记去重(contract_symbol)
             return
 
         # 使用稳定后的状态进行后续风控
@@ -191,7 +235,7 @@ class SignalHandler:
                 analysis["error"],
             )
             await self._执行市价开仓(contract_symbol, msg_price, balance)
-            self._dedup.add(contract_symbol)
+            self._标记去重(contract_symbol)
             return
 
         entry_zone = analysis["entry_zone"]
@@ -265,7 +309,7 @@ class SignalHandler:
         else:
             logger.warning("【第9步】入场评级=%s 未知，跳过", entry_zone)
 
-        self._dedup.add(contract_symbol)
+        self._标记去重(contract_symbol)
 
     # ── 市场状态稳定确认（新增） ─────────────────────────────
 
@@ -296,8 +340,13 @@ class SignalHandler:
         # ════════════════════════════════════════════
         contract_symbol = self._cfg.coin_mapping.get(coin)
         if contract_symbol is None:
-            logger.warning("【第3步】未找到币种 '%s' 的合约映射，跳过", coin)
-            return
+            auto_sym = f"{coin}USDT"
+            if self._exchange.contract_exists(auto_sym):
+                contract_symbol = auto_sym
+                logger.info("【第3步】自动映射 %s -> %sUSDT", coin, coin)
+            else:
+                logger.warning("【第3步】未找到币种 '%s' 的合约映射，跳过", coin)
+                return
         logger.info("【第3步】映射 %s -> %s", coin, contract_symbol)
 
         # ════════════════════════════════════════════
@@ -321,7 +370,7 @@ class SignalHandler:
         # ════════════════════════════════════════════
         if self._exchange.has_open_position(contract_symbol):
             logger.info("【第6步】合约 %s 已有持仓，跳过重复开仓", contract_symbol)
-            self._dedup.add(contract_symbol)
+            self._标记去重(contract_symbol)
             return
         logger.info("【第6步】持仓检查通过（无持仓）")
 
@@ -333,6 +382,18 @@ class SignalHandler:
             logger.error("【第7步】账户余额为 0 或获取失败，中止")
             return
         logger.info("【第7步】账户余额: %.2f USDT", balance)
+
+        # ════════════════════════════════════════════
+        # 风控：检查最大持仓数
+        # ════════════════════════════════════════════
+        open_count = self._exchange.get_open_positions_count()
+        if open_count >= self._cfg.max_open_positions:
+            logger.info(
+                "【风控】已达最大持仓数 %d/%d，跳过 %s",
+                open_count, self._cfg.max_open_positions, contract_symbol,
+            )
+            self._标记去重(contract_symbol)
+            return
 
         # ════════════════════════════════════════════
         # 第8步A：市场状态分类
@@ -364,7 +425,7 @@ class SignalHandler:
             logger.warning(
                 "【第8步A+】市场状态未稳定（confirm < 2），跳过本次交易",
             )
-            self._dedup.add(contract_symbol)
+            self._标记去重(contract_symbol)
             return
 
         # 使用稳定后的状态进行后续风控
@@ -389,7 +450,7 @@ class SignalHandler:
                 analysis["error"],
             )
             await self._执行市价开仓(contract_symbol, msg_price, balance)
-            self._dedup.add(contract_symbol)
+            self._标记去重(contract_symbol)
             return
 
         entry_zone = analysis["entry_zone"]
@@ -463,7 +524,7 @@ class SignalHandler:
         else:
             logger.warning("【第9步】入场评级=%s 未知，跳过", entry_zone)
 
-        self._dedup.add(contract_symbol)
+        self._标记去重(contract_symbol)
 
     def _确认市场状态(
         self,
