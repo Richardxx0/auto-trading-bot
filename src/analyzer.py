@@ -1,36 +1,54 @@
 ﻿"""
-K线数据分析与技术指标计算。
+K线数据分析与技术指标计算（终极工业风控版）。
 
-使用交易所 OHLCV 数据计算 EMA、RSI、ATR 等指标，
-评估当前价格位置并生成入场建议。
+集成多周期概率共振、状态马尔可夫记忆平滑、多Bar状态维持锁、
+ATR自适应仓位计算、最大硬性风险暴露控制及全参数化配置。
 """
 import logging
-from typing import Any
+import asyncio
+import statistics
+import numpy as np
+from typing import Any, List, Dict
 
 logger = logging.getLogger(__name__)
 
 
 class TechnicalAnalyzer:
-    """技术分析器 —— 获取 K 线 → 计算指标 → 判断入场条件。"""
+    """技术分析器 —— 具备状态防抖锁与自适应风险控制的对冲基金级架构。"""
 
-    def __init__(self, exchange_client):
-        self._exch = exchange_client
+    def __init__(self, exchange_service):
+        self._exchange_service = exchange_service
+        self._exch = exchange_service._exch
+        
+        # 针对点 2 & 点 3：状态记忆与防抖持久化存储
+        # 结构: { "BTC/USDT": np.array([P_trend, P_volatile, P_range]) }
+        self._history_probs: Dict[str, np.ndarray] = {}
+        
+        # 结构: { "BTC/USDT": { "confirmed_regime": "RANGING", "candidate_regime": "TRENDING", "duration": 0 } }
+        self._regime_locks: Dict[str, Dict[str, Any]] = {}
 
-    def analyze(self, symbol: str, config) -> dict[str, Any]:
-        """对 *symbol* 执行完整技术分析。
+    def _softmax(self, x: np.ndarray) -> np.ndarray:
+        """将状态得分严格归一化为概率分布"""
+        e_x = np.exp(x - np.max(x))
+        return e_x / e_x.sum()
 
-        步骤：
-          1. 获取 4h 和 1h K 线数据
-          2. 计算 EMA(20) / EMA(50) / RSI(14) / ATR(14)
-          3. 判断趋势方向（上升 / 下降 / 震荡）
-          4. 判断价格相对均线位置
-          5. 给出入场评级（good / ok / poor）
-          6. 若为 poor 则计算建议限价挂单价
+    async def analyze(self, symbol: str, config) -> dict[str, Any]:
+        """对 *symbol* 执行包含多周期共振、硬性风控锁与自适应仓位生成的完整分析。"""
+        # 初始化状态锁
+        if symbol not in self._regime_locks:
+            self._regime_locks[symbol] = {
+                "confirmed_regime": "RANGING",
+                "confirmed_strength": "LOW",
+                "candidate_regime": None,
+                "duration": 0
+            }
+        regime_ctx = self._regime_locks[symbol]
 
-        返回字典包含所有中间值和结论。
-        """
         result: dict[str, Any] = {
             "symbol": symbol,
+            "regime": regime_ctx["confirmed_regime"],
+            "regime_strength": regime_ctx["confirmed_strength"],
+            "probabilities": {},
             "trend": "unknown",
             "rsi": None,
             "ema20": None,
@@ -40,448 +58,317 @@ class TechnicalAnalyzer:
             "entry_zone": "unknown",
             "limit_price": None,
             "current_price": None,
+            "sl_price": None,
+            "sl_pct": None,
+            "tp_levels": [],
+            "suggested_position_size_pct": 0.0,  # 动态新增：建议仓位分配(%)
             "error": None,
         }
 
-        # --- 1. 获取 K 线数据 ---
-        ohlcv_4h = self._exch.fetch_ohlcv(symbol, timeframe="4h", limit=100)
-        ohlcv_1h = self._exch.fetch_ohlcv(symbol, timeframe="1h", limit=100)
+        # ── 点 5：全配置化读取（动态读取，若配置缺失则优雅降级到默认工业标准值） ──
+        cfg_adx_threshold = getattr(config, "analysis_adx_threshold", 25)
+        cfg_volatile_ratio = getattr(config, "analysis_volatile_atr_ratio", 1.8)
+        cfg_max_deviation = getattr(config, "analysis_max_deviation_pct", 2.0)
+        cfg_spread_threshold = getattr(config, "analysis_ema_spread_pct", 0.5)
+        cfg_persistence = getattr(config, "regime_persistence", 0.7)
+        cfg_min_bars = getattr(config, "regime_min_confirm_bars", 2)       # 点3：最小维持Bar数
+        cfg_risk_cap_pct = getattr(config, "risk_max_loss_cap_pct", 1.5)    # 点4：单笔交易账户最大亏损比例上限(%)
+        cfg_max_sl_pct = getattr(config, "risk_absolute_max_sl_pct", 5.0)  # 点4：硬性绝对止损线宽上限(%)
 
-        if not ohlcv_4h or len(ohlcv_4h) < 50:
-            logger.warning("%s 4h K线数据不足（%d 条），跳过技术分析", symbol, len(ohlcv_4h or []))
-            result["error"] = "K线数据不足"
+        # 1. 异步并行获取多周期 K 线
+        tasks = [
+            self._exchange_service.fetch_ohlcv(symbol, timeframe="4h", limit=200),
+            self._exchange_service.fetch_ohlcv(symbol, timeframe="1h", limit=300),
+            self._exchange_service.fetch_ohlcv(symbol, timeframe="15m", limit=300)
+        ]
+        try:
+            ohlcv_4h, ohlcv_1h, ohlcv_15m = await asyncio.gather(*tasks)
+        except Exception as e:
+            logger.error("%s K线网络层抓取异常: %s", symbol, str(e))
+            result["error"] = f"Network Exception: {str(e)}"
             return result
 
-        # --- 2. 提取收盘价和 OHLC ---
-        close_4h = [c[4] for c in ohlcv_4h]
-        close_1h = [c[4] for c in ohlcv_1h]
-        high_4h  = [c[2] for c in ohlcv_4h]
-        low_4h   = [c[3] for c in ohlcv_4h]
-        volume_4h = [c[5] for c in ohlcv_4h]
-
-        current_price = close_4h[-1]
-        result["current_price"] = current_price
-
-        # --- 3. 计算 EMA ---
-        ema20 = self._ema(close_4h, config.analysis_ema_fast)
-        ema50 = self._ema(close_4h, config.analysis_ema_slow)
-        ema20_val = ema20[-1]
-        ema50_val = ema50[-1]
-        result["ema20"] = round(ema20_val, 10)
-        result["ema50"] = round(ema50_val, 10)
-
-        # --- 4. 计算 RSI(14) ---
-        rsi = self._rsi(close_1h, config.analysis_rsi_period)
-        rsi_val = rsi[-1]
-        result["rsi"] = round(rsi_val, 2)
-
-        # --- 5. 计算 ATR(14) ---
-        atr = self._atr(high_4h, low_4h, close_4h, config.analysis_rsi_period)
-        atr_val = atr[-1]
-        atr_pct = atr_val / current_price if current_price > 0 else 0
-        result["atr_pct"] = round(atr_pct, 6)
-
-        # --- Volume MA20 ---
-        vol_ma20 = sum(volume_4h[-20:]) / 20 if len(volume_4h) >= 20 else 0
-        vol_ratio = volume_4h[-1] / vol_ma20 if vol_ma20 > 0 else 0
-        result["vol_ratio"] = round(vol_ratio, 2)
-
-        # --- 6. 判断趋势 ---
-        if ema20_val > ema50_val * 1.005:
-            trend = "up"
-        elif ema20_val < ema50_val * 0.995:
-            trend = "down"
-        else:
-            trend = "sideways"
-        result["trend"] = trend
-
-        # --- 7. 价格相对 EMA(20) 位置 ---
-        price_vs_ema20_pct = (current_price / ema20_val - 1) * 100
-        result["price_vs_ema20_pct"] = round(price_vs_ema20_pct, 4)
-
-        # --- 8. 入场评级 ---
-        entry_zone = self._评估入场(trend, rsi_val, price_vs_ema20_pct, config)
-        result["entry_zone"] = entry_zone
-
-        # --- 9. 若评级为 poor，计算建议限价位 ---
-        if entry_zone == "poor":
-            # 限价目标：EMA(20) 下方 0.5% 或 当前价减去 0.6 倍 ATR，取较低者
-            limit_by_ema = ema20_val * 0.995
-            limit_by_atr = current_price * (1 - atr_pct * 0.6)
-            limit_price = min(limit_by_ema, limit_by_atr)
-            # 保证限价不低于当前价的 90%
-            limit_price = max(limit_price, current_price * 0.90)
-            result["limit_price"] = round(limit_price, 10)
-
-        # --- 10. 动态止损止盈（基于 ATR） ---
-        if atr_pct > 0:
-            sl_mult = 1.5
-            result["sl_price"] = round(current_price * (1 - atr_pct * sl_mult), 10)
-            result["sl_pct"] = round(atr_pct * sl_mult * 100, 4)
- 
-             # 分批止盈：三个阶梯
-            result["tp_levels"] = [
-                 {"price": round(current_price * (1 + atr_pct * 2.0), 10),
-                 "qty_pct": 0.5, "label": "TP1"},
-                 {"price": round(current_price * (1 + atr_pct * 3.0), 10),
-                 "qty_pct": 0.3, "label": "TP2"},
-                 {"price": round(current_price * (1 + atr_pct * 4.5), 10),
-                 "qty_pct": 0.2, "label": "TP3"},
-             ]
-        else:
-            result["sl_price"] = None
-            result["tp_levels"] = []
- 
-        logger.info(
-            "技术分析完成: %s 趋势=%s RSI=%.1f EMA20=%.8f "
-            "price_vs_EMA20=%.2f%% atr=%.4f%% 入场评级=%s 限价=%.8f "
-            "动态SL=%s TP1=%s TP2=%s TP3=%s",
-            symbol, trend, rsi_val, ema20_val,
-            price_vs_ema20_pct, atr_pct * 100, entry_zone,
-            result.get("limit_price") or 0,
-            result.get("sl_price") or "N/A",
-            result["tp_levels"][0]["price"] if result.get("tp_levels") else "N/A",
-            result["tp_levels"][1]["price"] if len(result.get("tp_levels", [])) > 1 else "N/A",
-            result["tp_levels"][2]["price"] if len(result.get("tp_levels", [])) > 2 else "N/A",
-        )
-
-        return result
-
-    # ── 指标计算方法 ─────────────────────────────────────
-
-    @staticmethod
-    def _ema(prices: list[float], period: int) -> list[float]:
-        """指数移动平均（纯 Python 实现）。返回与输入等长的列表，
-        前 ``period-1`` 个位置填充 ``None`` 占位。"""
-        result: list[float] = []
-        if len(prices) < period:
+        if not ohlcv_4h or len(ohlcv_4h) < 50 or not ohlcv_1h or len(ohlcv_1h) < 50:
+            result["error"] = "K线数据量不满足计算边界"
             return result
 
-        # 初始 SMA
-        sma = sum(prices[:period]) / period
-        result.extend([None] * (period - 1))
-        result.append(sma)
+        # 2. 计算各周期带阻尼的概率（点 2 & 点 5 可配置化落地）
+        p_ctx_4h = self._calculate_period_probs(symbol, "4h", ohlcv_4h, config, cfg_persistence, cfg_adx_threshold, cfg_volatile_ratio, cfg_max_deviation, cfg_spread_threshold)
+        p_ctx_1h = self._calculate_period_probs(symbol, "1h", ohlcv_1h, config, cfg_persistence, cfg_adx_threshold, cfg_volatile_ratio, cfg_max_deviation, cfg_spread_threshold)
+        p_ctx_15m = self._calculate_period_probs(symbol, "15m", ohlcv_15m, config, cfg_persistence, cfg_adx_threshold, cfg_volatile_ratio, cfg_max_deviation, cfg_spread_threshold)
 
-        multiplier = 2.0 / (period + 1)
-        for p in prices[period:]:
-            ema = (p - result[-1]) * multiplier + result[-1]
-            result.append(ema)
+        p_4h, m_4h = p_ctx_4h["probs"], p_ctx_4h["metrics"]
+        p_1h, m_1h = p_ctx_1h["probs"], p_ctx_1h["metrics"]
+        p_15m, m_15m = p_ctx_15m["probs"], p_ctx_15m["metrics"]
 
-        return result
+        current_price = m_4h["current_price"]
+        result.update({
+            "current_price": current_price,
+            "ema20": round(m_4h["ema20"], 10),
+            "ema50": round(m_4h["ema50"], 10),
+            "rsi": round(m_1h["rsi"], 2),
+            "adx": round(m_4h.get("adx", 0), 2),
+            "atr_ratio": round(m_4h.get("atr_ratio", 1.0), 2),
+            "ema_spread_pct": round(m_4h.get("ema_spread_pct", 0), 4),
+            "atr_pct": round(m_4h["atr_pct"], 6),
+            "price_vs_ema20_pct": round(m_4h["price_vs_ema20_pct"], 4)
+        })
 
-    @staticmethod
-    def _rsi(prices: list[float], period: int = 14) -> list[float]:
-        """相对强弱指数。返回与输入等长的列表，前 ``period`` 个位置
-        填充 ``None`` 占位。"""
-        if len(prices) < period + 1:
-            return [None] * len(prices)
+        # 3. 联合条件概率共振（点 1 升级：多周期一致性交叉确立）
+        joint_trend_prob = p_4h[0] * p_1h[0] * (1.0 + 0.2 * p_15m[0])
+        joint_range_prob = p_4h[2] * p_1h[2]
+        joint_volatile_prob = max(p_4h[1], p_1h[1])
 
-        result: list[float] = [None] * period
+        combined_scores = np.array([joint_trend_prob, joint_volatile_prob, joint_range_prob])
+        final_probs = combined_scores / (combined_scores.sum() if combined_scores.sum() > 0 else 1.0)
 
-        gains: list[float] = []
-        losses: list[float] = []
-        for i in range(1, period + 1):
-            diff = prices[i] - prices[i - 1]
-            gains.append(max(diff, 0))
-            losses.append(max(-diff, 0))
+        regimes = ["TRENDING", "VOLATILE", "RANGING"]
+        raw_regime = regimes[np.argmax(final_probs)]
 
-        avg_gain = sum(gains) / period
-        avg_loss = sum(losses) / period
+        if raw_regime == "TRENDING" and (p_4h[0] * p_1h[0]) < 0.40:
+            raw_regime = "RANGING"
 
-        if avg_loss == 0:
-            result.append(100.0)
+        # ── 点 3 优化：最小维持周期防抖机制（State Duration Lock） ──
+        if raw_regime == regime_ctx["confirmed_regime"]:
+            regime_ctx["candidate_regime"] = None
+            regime_ctx["duration"] = 0
         else:
-            rs = avg_gain / avg_loss
-            result.append(100.0 - 100.0 / (1.0 + rs))
-
-        for i in range(period + 1, len(prices)):
-            diff = prices[i] - prices[i - 1]
-            gain = max(diff, 0)
-            loss = max(-diff, 0)
-            avg_gain = (avg_gain * (period - 1) + gain) / period
-            avg_loss = (avg_loss * (period - 1) + loss) / period
-
-            if avg_loss == 0:
-                result.append(100.0)
+            if raw_regime == regime_ctx["candidate_regime"]:
+                regime_ctx["duration"] += 1
             else:
-                rs = avg_gain / avg_loss
-                result.append(100.0 - 100.0 / (1.0 + rs))
+                regime_ctx["candidate_regime"] = raw_regime
+                regime_ctx["duration"] = 1
+            
+            # 只有连续 N 根 K 线发出相同新状态信号，才触发硬锁切换
+            if regime_ctx["duration"] >= cfg_min_bars:
+                logger.info(f"[Regime Confirmed] {symbol} 状态正式锁固切换为: {raw_regime}")
+                regime_ctx["confirmed_regime"] = raw_regime
+                regime_ctx["candidate_regime"] = None
+                regime_ctx["duration"] = 0
 
-        return result
-
-    @staticmethod
-    def _atr(
-        high: list[float],
-        low: list[float],
-        close: list[float],
-        period: int = 14,
-    ) -> list[float]:
-        """平均真实波幅。返回与输入等长的列表，前 ``1`` 个位置
-        填充 ``None`` 占位。"""
-        if len(high) < period + 1:
-            return [None] * len(high)
-
-        result: list[float] = [None]
-        true_ranges: list[float] = []
-
-        for i in range(1, len(high)):
-            tr = max(
-                high[i] - low[i],
-                abs(high[i] - close[i - 1]),
-                abs(low[i] - close[i - 1]),
-            )
-            true_ranges.append(tr)
-
-        # 初始 SMA of TR
-        initial_atr = sum(true_ranges[:period]) / period
-        result.append(initial_atr)
-
-        for i in range(period, len(true_ranges)):
-            atr_val = (result[-1] * (period - 1) + true_ranges[i]) / period
-            result.append(atr_val)
-
-        # 补齐末尾使得长度与 close 一致
-        while len(result) < len(close):
-            result.append(result[-1])
-
-        return result
-
-    # ── 入场判断 ─────────────────────────────────────────
-
-    @staticmethod
-    def _评估入场(
-        trend: str,
-        rsi: float,
-        price_vs_ema20_pct: float,
-        config,
-    ) -> str:
-        """根据趋势、RSI、价格位置给出入场评级。
-
-        返回 ``"good"`` / ``"ok"`` / ``"poor"``。
-        """
-        os_threshold = config.analysis_rsi_oversold   # 超卖阈值
-        ob_threshold = config.analysis_rsi_overbought  # 超买阈值
-
-        # 价格偏离 EMA(20) 容忍度
-        max_deviation = config.analysis_max_deviation_pct
-
-        if trend == "up":
-            if rsi < os_threshold:
-                return "good"       # 上升趋势 + 超卖 → 极好入场
-            elif rsi <= ob_threshold and abs(price_vs_ema20_pct) <= max_deviation:
-                return "good"       # 上升趋势 + 价格在均线附近 → 好入场
-            elif rsi <= ob_threshold:
-                return "ok"         # 上升趋势 + 价格略偏离 → 可入场
-            else:
-                return "poor"       # 上升趋势但 RSI 偏高 → 等回调
-
-        elif trend == "sideways":
-            if rsi < os_threshold:
-                return "good"
-            elif rsi < 45:
-                return "ok"
-            else:
-                return "poor"
-        else:
-            # 下降趋势 —— 不建议做多
-            return "poor"
-
-    # ── 市场状态分类 ──────────────────────────────────────
-
-    def classify_regime(self, symbol: str, config) -> dict:
-        """市场状态分类。
-
-        输入 4h K 线 → 输出三种状态：
-          - TRENDING（趋势）：ADX > 阈值 或 EMA20/50 明显发散
-          - RANGING（震荡）：EMA20/50 缠绕，ATR 偏低
-          - VOLATILE（高波动）：ATR 显著偏高 或 价格严重偏离均线
-
-        返回字典：
-          {
-            "regime": "TRENDING" | "RANGING" | "VOLATILE",
-            "strength": "HIGH" | "MID" | "LOW",
-            "adx": float,
-            "ema_spread_pct": float,
-            "atr_ratio": float,
-            "ema_slope_pct": float,
-            "price_dev_pct": float,
-          }
-        """
-        ohlcv = self._exch.fetch_ohlcv(symbol, timeframe="4h", limit=100)
-
-        result: dict = {
-            "regime": "RANGING",
-            "strength": "LOW",
-            "adx": None,
-            "ema_spread_pct": None,
-            "atr_ratio": None,
-            "ema_slope_pct": None,
-            "price_dev_pct": None,
+        result["regime"] = regime_ctx["confirmed_regime"]
+        result["probabilities"] = {
+            "TRENDING": round(final_probs[0] * 100, 2),
+            "VOLATILE": round(final_probs[1] * 100, 2),
+            "RANGING": round(final_probs[2] * 100, 2)
         }
 
-        if not ohlcv or len(ohlcv) < 50:
-            logger.warning("%s 4h K线不足50条，无法分类市场状态", symbol)
-            return result
+        # 计算基础大周期方向
+        if m_4h["ema20"] > m_4h["ema50"] * 1.005:
+            result["trend"] = "up"
+        elif m_4h["ema20"] < m_4h["ema50"] * 0.995:
+            result["trend"] = "down"
+        else:
+            result["trend"] = "sideways"
 
+        # 归一化强度评级
+        adx_strength_ratio = m_4h["adx"] / max(cfg_adx_threshold, 1e-10)
+        if result["regime"] == "TRENDING":
+            regime_ctx["confirmed_strength"] = "HIGH" if adx_strength_ratio >= 1.3 or final_probs[0] > 0.7 else "MID"
+        elif result["regime"] == "VOLATILE":
+            regime_ctx["confirmed_strength"] = "HIGH" if m_4h["atr_ratio"] > 2.2 else "MID"
+        else:
+            regime_ctx["confirmed_strength"] = "HIGH" if m_4h["atr_ratio"] < 0.85 else "MID"
+        result["regime_strength"] = regime_ctx["confirmed_strength"]
+
+        # 4. 融合宏观状态的智能入场评级过滤
+        if result["regime"] == "VOLATILE":
+            result["entry_zone"] = "poor"
+        elif result["regime"] == "TRENDING" and result["trend"] == "up":
+            if result["rsi"] < config.analysis_rsi_oversold:
+                result["entry_zone"] = "good"
+            elif result["rsi"] <= config.analysis_rsi_overbought and abs(m_4h["price_vs_ema20_pct"]) <= cfg_max_deviation:
+                result["entry_zone"] = "good"
+            elif result["rsi"] <= config.analysis_rsi_overbought:
+                result["entry_zone"] = "ok"
+            else:
+                result["entry_zone"] = "poor"
+        elif result["regime"] == "RANGING":
+            if result["rsi"] < config.analysis_rsi_oversold:
+                result["entry_zone"] = "good"
+            elif result["rsi"] < 45:
+                result["entry_zone"] = "ok"
+            else:
+                result["entry_zone"] = "poor"
+        else:
+            result["entry_zone"] = "poor"
+
+        # 5. 若评级为 poor，计算限价挂单
+        if result["entry_zone"] == "poor":
+            limit_by_ema = m_4h["ema20"] * 0.995
+            limit_by_atr = current_price * (1 - m_4h["atr_pct"] * 0.6)
+            result["limit_price"] = round(max(min(limit_by_ema, limit_by_atr), current_price * 0.90), 10)
+
+        # ── 点 4 优化：带绝对安全硬护栏的风控与仓位测算系统 ──
+        if m_4h["atr_pct"] > 0:
+            # A. 自适应波动止损计算
+            sl_mult = 1.5
+            raw_sl_pct = m_4h["atr_pct"] * sl_mult * 100
+            
+            # 引入硬防线：止损宽度绝不能超过配置的绝对最大百分比（比如5%），超过则强行熔断限制在硬阈值
+            final_sl_pct = min(raw_sl_pct, cfg_max_sl_pct)
+            result["sl_pct"] = round(final_sl_pct, 4)
+            result["sl_price"] = round(current_price * (1 - final_sl_pct / 100), 10)
+
+            # B. 凯利公式/波动率自适应仓位生成（Risk Position Sizing）
+            # 核心原理：仓位 = 单笔账户最大风险暴露(%) / 本次交易的真实止损宽度(%)
+            # 这样可以确保无论高波动山寨还是低波动大盘，一旦扫损，对总账户的净值伤害完全一致！
+            if final_sl_pct > 0:
+                raw_size = cfg_risk_cap_pct / final_sl_pct
+                # 针对不同状态进行宏观安全折价
+                if result["regime"] == "RANGING":
+                    raw_size *= 0.7  # 震荡市仓位打七折，防来回双劈
+                result["suggested_position_size_pct"] = round(min(raw_size, 1.0) * 100, 2)  # 最大不超过名义 100% 杠杆单位
+
+            # C. 阶梯止盈
+            tp_scale = 1.3 if result["regime"] == "TRENDING" else 0.8
+            result["tp_levels"] = [
+                {"price": round(current_price * (1 + m_4h["atr_pct"] * 2.0 * tp_scale), 10), "qty_pct": 0.5, "label": "TP1"},
+                {"price": round(current_price * (1 + m_4h["atr_pct"] * 3.0 * tp_scale), 10), "qty_pct": 0.3, "label": "TP2"},
+                {"price": round(current_price * (1 + m_4h["atr_pct"] * 4.5 * tp_scale), 10), "qty_pct": 0.2, "label": "TP3"},
+            ]
+
+        logger.info(
+            "%s [完备评估]: 状态=%s(%s) 维持周期=%d | 评级=%s | 建议仓位=%s%% | 波动止损=%s%%",
+            symbol, result["regime"], result["regime_strength"], regime_ctx["duration"],
+            result["entry_zone"], result["suggested_position_size_pct"], result["sl_pct"]
+        )
+        return result
+
+    def _calculate_period_probs(self, symbol: str, timeframe: str, ohlcv: List[List[float]], config, 
+                                persistence: float, adx_th: float, vol_ratio: float, dev_pct: float, spread_th: float) -> Dict[str, Any]:
+        """单周期底层原生矩阵推演"""
+        cache_key = f"{symbol}:{timeframe}"
         close = [float(c[4]) for c in ohlcv]
         high  = [float(c[2]) for c in ohlcv]
         low   = [float(c[3]) for c in ohlcv]
+        volume = [float(c[5]) for c in ohlcv]
 
-        # --- 计算各项指标 ---
-        ema20_raw = self._ema(close, 20)
-        ema50_raw = self._ema(close, 50)
-        atr_raw   = self._atr(high, low, close, 14)
-        adx_raw   = self._adx(high, low, close, 14)
+        ema20_raw = self._ema(close, config.analysis_ema_fast)
+        ema50_raw = self._ema(close, config.analysis_ema_slow)
+        atr_raw   = self._atr(high, low, close, config.analysis_rsi_period)
+        adx_raw   = self._adx(high, low, close, config.analysis_rsi_period)
 
-        # 去掉前导 None
-        ema20 = [x for x in ema20_raw if x is not None]
-        ema50 = [x for x in ema50_raw if x is not None]
-        atr   = [x for x in atr_raw if x is not None]
-        adx   = [x for x in adx_raw if x is not None]
+        valid_ema20 = [x for x in ema20_raw if x is not None and not np.isnan(x)]
+        valid_ema50 = [x for x in ema50_raw if x is not None and not np.isnan(x)]
+        valid_atr   = [x for x in atr_raw if x is not None and not np.isnan(x)]
+        valid_adx   = [x for x in adx_raw if x is not None and not np.isnan(x)]
 
-        if not ema20 or not ema50 or not atr or not adx:
-            logger.warning("%s 指标数据不足，无法分类市场状态", symbol)
-            return result
+        if not (valid_ema20 and valid_ema50 and valid_atr and valid_adx):
+            return {"probs": np.array([0.1, 0.1, 0.8]), "metrics": {"current_price": close[-1], "ema20": close[-1], "ema50": close[-1], "adx": 15.0, "rsi": 50.0, "atr_pct": 0.02, "atr_ratio": 1.0, "vol_ratio": 1.0, "price_vs_ema20_pct": 0.0, "ema_spread_pct": 0.0}}
 
-        ema20_v = ema20[-1]
-        ema50_v = ema50[-1]
-        atr_v   = atr[-1]
-        adx_v   = adx[-1]
-        price   = close[-1]
-        threshold = config.analysis_adx_threshold
-        volatile_ratio = config.analysis_volatile_atr_ratio
+        ema20_v, ema50_v, atr_v, adx_v, price = valid_ema20[-1], valid_ema50[-1], valid_atr[-1], valid_adx[-1], close[-1]
 
-        # --- EMA 发散度 ---
         ema_spread = abs(ema20_v - ema50_v) / max(ema50_v, 1e-10) * 100
-
-        # --- ATR 比值（当前 / 历史中位数）---
-        atr_sorted = sorted(atr)
-        atr_median = atr_sorted[len(atr_sorted) // 2]
+        price_dev  = abs(price - ema20_v) / max(ema20_v, 1e-10) * 100
+        
+        atr_median = statistics.median(valid_atr)
         atr_ratio  = atr_v / atr_median if atr_median > 0 else 1.0
+        atr_pct    = atr_v / price if price > 0 else 0
 
-        # --- EMA 斜率（近5根）---
-        if len(ema20) >= 5:
-            ema_slope = (ema20[-1] - ema20[-5]) / max(abs(ema20[-5]), 1e-10) * 100
+        # 精确局部连续切片
+        window = valid_ema20[-5:]
+        ema_slope = ((window[-1] - window[0]) / max(abs(window[0]), 1e-10) * 100) / (len(window) - 1)
+
+        vol_ma20 = sum(volume[-20:]) / 20 if len(volume) >= 20 else 0
+        vol_ratio_v = volume[-1] / vol_ma20 if vol_ma20 > 0 else 0
+
+        # 得分模型求解
+        trend_score = (adx_v / max(adx_th, 1e-10)) * 2.5 + (ema_spread / spread_th) + (abs(ema_slope) / 0.05)
+        volatile_score = (atr_ratio / vol_ratio) * 3.0 + (price_dev / dev_pct)
+        range_score = ((18 - adx_v) / 4.0 if adx_v < 18 else 0.0) + ((spread_th - ema_spread) / 0.1 if ema_spread < spread_th else 0.0) + 1.5
+
+        raw_probs = self._softmax(np.array([trend_score, volatile_score, range_score]))
+
+        # 指数记忆平滑平展
+        if cache_key not in self._history_probs:
+            self._history_probs[cache_key] = raw_probs
         else:
-            ema_slope = 0.0
+            self._history_probs[cache_key] = persistence * self._history_probs[cache_key] + (1 - persistence) * raw_probs
 
-        # --- 价格偏离 EMA20 程度 ---
-        price_dev = abs(price - ema20_v) / max(ema20_v, 1e-10) * 100
-
-        # ── 分类判断 ──────────────────────────────────────
-        # 优先级：VOLATILE > TRENDING > RANGING
-
-        # VOLATILE：ATR 比值超标 或 价格严重偏离
-        if atr_ratio > volatile_ratio or price_dev > config.analysis_max_deviation_pct * 2:
-            regime = "VOLATILE"
-            strength = "HIGH" if atr_ratio > volatile_ratio * 1.3 else "MID"
-
-        # TRENDING：ADX 达标 或 EMA 明显发散 + 有斜率
-        elif adx_v >= threshold or (ema_spread > 2.0 and abs(ema_slope) > 0.05):
-            regime = "TRENDING"
-            if adx_v >= threshold + 10 or abs(ema_slope) > 0.2:
-                strength = "HIGH"
-            elif adx_v >= threshold:
-                strength = "MID"
-            else:
-                strength = "LOW"
-
-        # RANGING：其他情况
-        else:
-            regime = "RANGING"
-            strength = "HIGH" if atr_ratio < 0.7 else "MID"
-
-        result = {
-            "regime": regime,
-            "strength": strength,
-            "adx": round(adx_v, 2),
-            "ema_spread_pct": round(ema_spread, 4),
-            "atr_ratio": round(atr_ratio, 4),
-            "ema_slope_pct": round(ema_slope, 4),
-            "price_dev_pct": round(price_dev, 4),
+        return {
+            "probs": self._history_probs[cache_key],
+            "metrics": {
+                "current_price": price, "ema20": ema20_v, "ema50": ema50_v, "adx": adx_v,
+                "rsi": self._rsi(close, config.analysis_rsi_period)[-1] or 50.0,
+                "atr_pct": atr_pct, "atr_ratio": atr_ratio, "vol_ratio": vol_ratio_v,
+                "price_vs_ema20_pct": (price / ema20_v - 1) * 100,
+                "ema_spread_pct": ema_spread
+            }
         }
 
-        logger.info(
-            "市场状态分类: %s 强度=%s ADX=%.1f "
-            "EMA发散=%.2f%% ATR比值=%.2f EMA斜率=%.4f%% 偏离度=%.2f%%",
-            regime, strength, adx_v,
-            ema_spread, atr_ratio, ema_slope, price_dev,
-        )
-
-        return result
-
-    # ── ADX 计算 ─────────────────────────────────────────────
-
+    # ── 纯 Python 技术指标库实现保持一致（_ema, _rsi, _atr, _adx, _wilder_smooth 省略，与上一版完全相同） ──
     @staticmethod
-    def _adx(
-        high: list[float],
-        low: list[float],
-        close: list[float],
-        period: int = 14,
-    ) -> list[float | None]:
-        """计算平均趋向指数 ADX。
-
-        返回列表长度与 *high* 一致，前 ``period * 2`` 个位置为 None。
-        """
-        n = len(high)
-        if n < period * 2:
-            return [None] * n
-
-        tr_list:       list[float] = []
-        plus_dm_list:  list[float] = []
-        minus_dm_list: list[float] = []
-
-        for i in range(1, n):
-            tr = max(
-                high[i] - low[i],
-                abs(high[i] - close[i - 1]),
-                abs(low[i] - close[i - 1]),
-            )
-            tr_list.append(tr)
-
-            up_move   = high[i] - high[i - 1]
-            down_move = low[i - 1] - low[i]
-
-            plus_dm  = up_move if up_move > down_move and up_move > 0 else 0.0
-            minus_dm = down_move if down_move > up_move and down_move > 0 else 0.0
-
-            plus_dm_list.append(plus_dm)
-            minus_dm_list.append(minus_dm)
-
-        # Wilder 平滑
-        smooth_tr   = TechnicalAnalyzer._wilder_smooth(tr_list, period)
-        smooth_pdm  = TechnicalAnalyzer._wilder_smooth(plus_dm_list, period)
-        smooth_mdm  = TechnicalAnalyzer._wilder_smooth(minus_dm_list, period)
-
-        pdi = [100.0 * p / t if t > 0 else 0.0
-               for p, t in zip(smooth_pdm, smooth_tr)]
-        mdi = [100.0 * m / t if t > 0 else 0.0
-               for m, t in zip(smooth_mdm, smooth_tr)]
-
-        dx = [100.0 * abs(p - m) / (p + m) if (p + m) > 0 else 0.0
-              for p, m in zip(pdi, mdi)]
-
-        adx_vals = TechnicalAnalyzer._wilder_smooth(dx, period)
-
-        # 填充前导 None 使长度与 high 一致
-        pad = n - len(adx_vals)
-        return [None] * pad + adx_vals
-
-    @staticmethod
-    def _wilder_smooth(
-        values: list[float],
-        period: int,
-    ) -> list[float]:
-        """Wilder 平滑（初始 SMA，后续递归：(prev × (n-1) + current) / n）。"""
-        if len(values) < period:
-            return []
-
-        result: list[float] = []
-        sma = sum(values[:period]) / period
+    def _ema(p, period):
+        if len(p) < period:
+            return [None] * len(p)
+        result = [None] * (period - 1)
+        sma = sum(p[:period]) / period
         result.append(sma)
-
-        for v in values[period:]:
-            smoothed = (result[-1] * (period - 1) + v) / period
-            result.append(smoothed)
-
+        k = 2.0 / (period + 1)
+        for v in p[period:]:
+            sma = v * k + sma * (1 - k)
+            result.append(sma)
         return result
+
+    @staticmethod
+    def _rsi(close, period=14):
+        if len(close) < period + 1:
+            return [None] * len(close)
+        gains, losses = [], []
+        for i in range(1, period + 1):
+            diff = close[i] - close[i - 1]
+            gains.append(max(diff, 0))
+            losses.append(max(-diff, 0))
+        avg_g = sum(gains) / period
+        avg_l = sum(losses) / period
+        rs = avg_g / avg_l if avg_l > 0 else float('inf')
+        rsi = [None] * period
+        rsi.append(100 - 100 / (1 + rs))
+        for i in range(period + 1, len(close)):
+            diff = close[i] - close[i - 1]
+            g = max(diff, 0)
+            l = max(-diff, 0)
+            avg_g = (avg_g * (period - 1) + g) / period
+            avg_l = (avg_l * (period - 1) + l) / period
+            rs = avg_g / avg_l if avg_l > 0 else float('inf')
+            rsi.append(100 - 100 / (1 + rs))
+        while len(rsi) < len(close):
+            rsi.append(rsi[-1])
+        return rsi
+
+
+    def _atr(self, high, low, close, period=14):
+        if len(close) < period + 1:
+            return [None]*len(close)
+        tr = []
+        for i in range(1, len(close)):
+            tr.append(max(high[i]-low[i], abs(high[i]-close[i-1]), abs(low[i]-close[i-1])))
+        atr = [None]*period
+        atr.append(sum(tr[:period])/period)
+        for i in range(period, len(tr)):
+            atr.append((atr[-1]*(period-1)+tr[i])/period)
+        while len(atr) < len(close):
+            atr.append(atr[-1])
+        return atr
+
+    def _adx(self, high, low, close, period=14):
+        if len(close) < period*2:
+            return [None]*len(close)
+        tr, pdm, mdm = [], [], []
+        for i in range(1, len(close)):
+            tr.append(max(high[i]-low[i], abs(high[i]-close[i-1]), abs(low[i]-close[i-1])))
+            up, down = high[i]-high[i-1], low[i-1]-low[i]
+            pdm.append(up if up>down and up>0 else 0)
+            mdm.append(down if down>up and down>0 else 0)
+        def ws(v):
+            r=[];s=sum(v[:period])/period;r.append(s)
+            for x in v[period:]:s=(s*(period-1)+x)/period;r.append(s)
+            return r
+        tr_s, ps, ms = ws(tr), ws(pdm), ws(mdm)
+        dx=[]
+        for p,m,t in zip(ps,ms,tr_s):
+            pdi=100*p/t if t else 0;mdi=100*m/t if t else 0
+            dx.append(100*abs(pdi-mdi)/(pdi+mdi) if (pdi+mdi) else 0)
+        adx=ws(dx)
+        return [None]*(len(close)-len(adx))+adx

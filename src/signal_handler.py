@@ -23,7 +23,7 @@ import time
 
 from config.settings import Config
 from src.parser import SignalParser
-from src.exchange import ExchangeClient
+from core.exchange_service import ExchangeService
 from src.risk_manager import RiskManager
 from src.analyzer import TechnicalAnalyzer
 from dashboard import trade_store as ts
@@ -34,12 +34,13 @@ logger = logging.getLogger(__name__)
 class SignalHandler:
     """信号处理器 —— 收到信号后完成解析、技术分析、决策、下单全流程。"""
 
-    def __init__(self, config: Config):
+    def __init__(self, config: Config, exchange_service: ExchangeService):
         self._cfg = config
         self._parser = SignalParser()
-        self._exchange = ExchangeClient(config)
+        self._exchange_service = exchange_service
+        self._exchange = exchange_service._exch
         self._risk = RiskManager(config)
-        self._analyzer = TechnicalAnalyzer(self._exchange)
+        self._analyzer = TechnicalAnalyzer(self._exchange_service)
         self._dedup: set[str] = set()
         self._dedup_file = os.path.join(
             os.path.dirname(os.path.dirname(os.path.abspath(__file__))),
@@ -52,6 +53,7 @@ class SignalHandler:
         self._market_state_cache: dict[str, dict] = {}
         self._consecutive_losses = 0
         self._banned_until = 0.0
+        self._trade_result: str | None = None
 
     def _加载去重记录(self) -> None:
         """从文件加载持久化的去重记录。"""
@@ -79,10 +81,12 @@ class SignalHandler:
             await self._处理信号(sender, text)
         except Exception as exc:
             logger.exception("信号处理器未捕获的错误: %s", exc)
+            return "失败"
 
 
-    async def on_web_signal(self, symbol: str, price: float, alert_count: int = 1) -> None:
-        """网页监听器的回调入口。"""
+    async def on_web_signal(self, symbol: str, price: float, alert_count: int = 1) -> str:
+        """返回开单结果: 已开单 / 跳过 / 失败"""
+        self._trade_result = None
         try:
             # 构造解析后的信号结构（省去第1步自然语言解析）
             signal = {
@@ -92,8 +96,10 @@ class SignalHandler:
                 "alert_count": alert_count,
             }
             await self._处理解析后的信号(signal, "yss-signal.com")
+            return self._trade_result or "跳过"
         except Exception as exc:
             logger.exception("信号处理器未捕获的错误: %s", exc)
+            return "失败"
 
     async def _处理信号(self, sender: str, text: str) -> None:
         # ════════════════════════════════════════════
@@ -106,6 +112,37 @@ class SignalHandler:
         coin = signal["symbol"]
         signal_type = signal["signal_type"]
         msg_price = signal.get("price")
+        alert_count = signal.get("alert_count", 0)
+
+        # 逐级加严：根据预警次数动态调整核实力度
+        if alert_count >= 10:
+            scr_level = 3
+        elif alert_count >= 6:
+            scr_level = 2
+        elif alert_count >= 2:
+            scr_level = 1
+        else:
+            scr_level = 0
+        min_confirm = getattr(self._cfg,"regime_min_confirm_bars",2) + scr_level
+        vol_mult = 1.0 + 0.5 * scr_level
+        if scr_level > 0:
+            logger.info("【逐级加严】预警次数=%d, 力度等级=%d, 需confirm>=%d, 成交量乘数=%.1f",
+                        alert_count, scr_level, min_confirm, vol_mult)
+
+        # 逐级加严：根据预警次数动态调整核实力度
+        if alert_count >= 10:
+            scr_level = 3
+        elif alert_count >= 6:
+            scr_level = 2
+        elif alert_count >= 2:
+            scr_level = 1
+        else:
+            scr_level = 0
+        min_confirm = getattr(self._cfg,"regime_min_confirm_bars",2) + scr_level
+        vol_mult = 1.0 + 0.5 * scr_level
+        if scr_level > 0:
+            logger.info("【逐级加严】预警次数=%d, 力度等级=%d, 需confirm>=%d, 成交量乘数=%.1f",
+                        alert_count, scr_level, min_confirm, vol_mult)
 
         logger.info("=" * 56)
         logger.info("【第1步】收到信号: 币种=%s 类型=%s 发送者=%s",
@@ -136,13 +173,6 @@ class SignalHandler:
                 return
         logger.info("【第3步】映射 %s -> %s", coin, contract_symbol)
 
-        # ════════════════════════════════════════════
-        # 第4步：内存去重
-        # ════════════════════════════════════════════
-        if contract_symbol in self._dedup:
-            logger.info("【第4步】合约 %s 在本轮会话中已处理过，跳过", contract_symbol)
-            return
-        logger.info("【第4步】内存去重通过")
 
         # ════════════════════════════════════════════
         # 第5步：检查合约存在
@@ -186,19 +216,19 @@ class SignalHandler:
         # 第8步A：市场状态分类
         # ════════════════════════════════════════════
         logger.info("【第8步A】开始市场状态分类（获取4hK线 + ADX + ATR比值）...")
-        regime_result = self._analyzer.classify_regime(contract_symbol, self._cfg)
-        raw_regime = regime_result["regime"]
-        raw_strength = regime_result["strength"]
+        analysis = await self._analyzer.analyze(contract_symbol, self._cfg)
+        raw_regime = analysis.get("regime","RANGING")
+        raw_strength = analysis.get("regime_strength", "MEDIUM")
 
         logger.info(
             "【第8步A】原始市场状态: %s  强度=%s  ADX=%s  ATR比值=%s  EMA发散=%.2f%%",
             raw_regime, raw_strength,
-            regime_result.get("adx", "N/A"),
-            regime_result.get("atr_ratio", "N/A"),
-            regime_result.get("ema_spread_pct", 0),
+            analysis.get("adx", "N/A"),
+            analysis.get("atr_ratio", "N/A"),
+            analysis.get("ema_spread_pct", 0),
         )
 
-        if regime_result.get("adx") is None:
+        if analysis.get("adx",0) is None:
             logger.warning("【第8步A】ADX数据不足，状态分类可能不准确")
 
         # ════════════════════════════════════════════
@@ -210,7 +240,7 @@ class SignalHandler:
 
         if confirmed_state is None:
             logger.warning(
-                "【第8步A+】市场状态未稳定（confirm < 2），跳过本次交易",
+                "【第8步A+】市场状态未稳定（confirm < min_confirm），跳过本次交易",
             )
             self._标记去重(contract_symbol)
             return
@@ -229,14 +259,14 @@ class SignalHandler:
         # 第8步B：技术分析
         # ════════════════════════════════════════════
         logger.info("【第8步B】开始技术分析（获取K线 + 计算EMA/RSI/ATR）...")
-        analysis = self._analyzer.analyze(contract_symbol, self._cfg)
+        
 
         # 成交量确认
         if self._cfg.volume_confirm_enabled and not analysis.get("error"):
             vol_r = analysis.get("vol_ratio", 0)
-            if vol_r < self._cfg.volume_min_ratio:
+            if vol_r < self._cfg.volume_min_ratio * vol_mult:
                 logger.info("【成交量过滤】%s vol=%.2f < 最低要求%.2f，跳过",
-                            contract_symbol, vol_r, self._cfg.volume_min_ratio)
+                            contract_symbol, vol_r, self._cfg.volume_min_ratio * vol_mult, vol_mult)
                 self._标记去重(contract_symbol)
                 return
 
@@ -249,7 +279,7 @@ class SignalHandler:
             self._标记去重(contract_symbol)
             return
 
-        entry_zone = analysis["entry_zone"]
+        entry_zone = analysis.get("entry_zone","poor")
         current_price = analysis.get("current_price", 0)
 
         logger.info(
@@ -258,6 +288,11 @@ class SignalHandler:
             analysis.get("rsi", "?"),
             entry_zone,
         )
+
+        # 逐级加严：预警次数高时提高入场评级要求
+        if scr_level >= 2 and entry_zone == "poor":
+            logger.info("【逐级加严】预警次数=%d(力度%d), 评级poor不达标, 跳过", alert_count, scr_level)
+            return
 
         # ════════════════════════════════════════════
         # 风控联动（基于稳定后的市场状态）
@@ -269,7 +304,7 @@ class SignalHandler:
                 "【风控联动】震荡行情（稳定状态）→ 禁止追涨，强制使用限价单",
             )
             entry_zone = "poor"
-            if analysis.get("limit_price") is None or analysis["limit_price"] <= 0:
+            if analysis.get("limit",0) is None or analysis["limit_price"] <= 0:
                 analysis["limit_price"] = current_price * 0.995
                 logger.info(
                     "【风控联动】震荡行情限价设为: %.8f（市价下方0.5%%）",
@@ -294,16 +329,18 @@ class SignalHandler:
         # ════════════════════════════════════════════
         if entry_zone in ("good", "ok"):
             logger.info("【第9步】入场评级=%s → 市价开多", entry_zone)
+            self._trade_result = "已开单"
             await self._执行市价开仓(
                 contract_symbol, msg_price, balance, risk_multiplier, analysis,
             )
 
         elif entry_zone == "poor":
-            limit_price = analysis.get("limit_price")
+            limit_price = analysis.get("limit",0)
             if limit_price is None or limit_price <= 0:
                 logger.warning(
                     "【第9步】入场评级=poor 但无有效限价，降级为市价开仓",
                 )
+                self._trade_result = "已开单"
                 await self._执行市价开仓(
                     contract_symbol, msg_price, balance, risk_multiplier, analysis,
                 )
@@ -312,6 +349,7 @@ class SignalHandler:
                     "【第9步】入场评级=poor → 挂限价单 %.8f （当前价 %.8f）",
                     limit_price, current_price,
                 )
+                self._trade_result = "已开单"
                 await self._执行限价开仓(
                     contract_symbol, limit_price, msg_price,
                     balance, risk_multiplier,
@@ -366,13 +404,6 @@ class SignalHandler:
                 return
         logger.info("【第3步】映射 %s -> %s", coin, contract_symbol)
 
-        # ════════════════════════════════════════════
-        # 第4步：内存去重
-        # ════════════════════════════════════════════
-        if contract_symbol in self._dedup:
-            logger.info("【第4步】合约 %s 在本轮会话中已处理过，跳过", contract_symbol)
-            return
-        logger.info("【第4步】内存去重通过")
 
         # ════════════════════════════════════════════
         # 第5步：检查合约存在
@@ -416,19 +447,19 @@ class SignalHandler:
         # 第8步A：市场状态分类
         # ════════════════════════════════════════════
         logger.info("【第8步A】开始市场状态分类（获取4hK线 + ADX + ATR比值）...")
-        regime_result = self._analyzer.classify_regime(contract_symbol, self._cfg)
-        raw_regime = regime_result["regime"]
-        raw_strength = regime_result["strength"]
+        analysis = await self._analyzer.analyze(contract_symbol, self._cfg)
+        raw_regime = analysis.get("regime","RANGING")
+        raw_strength = analysis.get("regime_strength", "MEDIUM")
 
         logger.info(
             "【第8步A】原始市场状态: %s  强度=%s  ADX=%s  ATR比值=%s  EMA发散=%.2f%%",
             raw_regime, raw_strength,
-            regime_result.get("adx", "N/A"),
-            regime_result.get("atr_ratio", "N/A"),
-            regime_result.get("ema_spread_pct", 0),
+            analysis.get("adx", "N/A"),
+            analysis.get("atr_ratio", "N/A"),
+            analysis.get("ema_spread_pct", 0),
         )
 
-        if regime_result.get("adx") is None:
+        if analysis.get("adx",0) is None:
             logger.warning("【第8步A】ADX数据不足，状态分类可能不准确")
 
         # ════════════════════════════════════════════
@@ -440,7 +471,7 @@ class SignalHandler:
 
         if confirmed_state is None:
             logger.warning(
-                "【第8步A+】市场状态未稳定（confirm < 2），跳过本次交易",
+                "【第8步A+】市场状态未稳定（confirm < min_confirm），跳过本次交易",
             )
             self._标记去重(contract_symbol)
             return
@@ -459,14 +490,14 @@ class SignalHandler:
         # 第8步B：技术分析
         # ════════════════════════════════════════════
         logger.info("【第8步B】开始技术分析（获取K线 + 计算EMA/RSI/ATR）...")
-        analysis = self._analyzer.analyze(contract_symbol, self._cfg)
+        
 
         # 成交量确认
         if self._cfg.volume_confirm_enabled and not analysis.get("error"):
             vol_r = analysis.get("vol_ratio", 0)
-            if vol_r < self._cfg.volume_min_ratio:
+            if vol_r < self._cfg.volume_min_ratio * vol_mult:
                 logger.info("【成交量过滤】%s vol=%.2f < 最低要求%.2f，跳过",
-                            contract_symbol, vol_r, self._cfg.volume_min_ratio)
+                            contract_symbol, vol_r, self._cfg.volume_min_ratio * vol_mult, vol_mult)
                 self._标记去重(contract_symbol)
                 return
 
@@ -479,7 +510,7 @@ class SignalHandler:
             self._标记去重(contract_symbol)
             return
 
-        entry_zone = analysis["entry_zone"]
+        entry_zone = analysis.get("entry_zone","poor")
         current_price = analysis.get("current_price", 0)
 
         logger.info(
@@ -488,6 +519,11 @@ class SignalHandler:
             analysis.get("rsi", "?"),
             entry_zone,
         )
+
+        # 逐级加严：预警次数高时提高入场评级要求
+        if scr_level >= 2 and entry_zone == "poor":
+            logger.info("【逐级加严】预警次数=%d(力度%d), 评级poor不达标, 跳过", alert_count, scr_level)
+            return
 
         # ════════════════════════════════════════════
         # 风控联动（基于稳定后的市场状态）
@@ -499,7 +535,7 @@ class SignalHandler:
                 "【风控联动】震荡行情（稳定状态）→ 禁止追涨，强制使用限价单",
             )
             entry_zone = "poor"
-            if analysis.get("limit_price") is None or analysis["limit_price"] <= 0:
+            if analysis.get("limit",0) is None or analysis["limit_price"] <= 0:
                 analysis["limit_price"] = current_price * 0.995
                 logger.info(
                     "【风控联动】震荡行情限价设为: %.8f（市价下方0.5%%）",
@@ -524,16 +560,18 @@ class SignalHandler:
         # ════════════════════════════════════════════
         if entry_zone in ("good", "ok"):
             logger.info("【第9步】入场评级=%s → 市价开多", entry_zone)
+            self._trade_result = "已开单"
             await self._执行市价开仓(
                 contract_symbol, msg_price, balance, risk_multiplier, analysis,
             )
 
         elif entry_zone == "poor":
-            limit_price = analysis.get("limit_price")
+            limit_price = analysis.get("limit",0)
             if limit_price is None or limit_price <= 0:
                 logger.warning(
                     "【第9步】入场评级=poor 但无有效限价，降级为市价开仓",
                 )
+                self._trade_result = "已开单"
                 await self._执行市价开仓(
                     contract_symbol, msg_price, balance, risk_multiplier, analysis,
                 )
@@ -542,6 +580,7 @@ class SignalHandler:
                     "【第9步】入场评级=poor → 挂限价单 %.8f （当前价 %.8f）",
                     limit_price, current_price,
                 )
+                self._trade_result = "已开单"
                 await self._执行限价开仓(
                     contract_symbol, limit_price, msg_price,
                     balance, risk_multiplier,
@@ -557,6 +596,7 @@ class SignalHandler:
         symbol: str,
         raw_regime: str,
         raw_strength: str,
+        min_confirm: int = 2,
     ) -> dict | None:
         """市场状态稳定确认。
 
@@ -580,8 +620,8 @@ class SignalHandler:
                 "last_update": now,
             }
             logger.info(
-                "[REGIME UPDATE] %s %s confirm=1/2（首次）",
-                symbol, raw_regime,
+                "[REGIME UPDATE] %s %s confirm=1/%d（首次）",
+                symbol, raw_regime, min_confirm,
             )
             return None
 
@@ -592,7 +632,7 @@ class SignalHandler:
             cached["confirm_count"] += 1
             cached["last_update"] = now
 
-            if cached["confirm_count"] >= 2:
+            if cached["confirm_count"] >= min_confirm:
                 logger.info(
                     "[REGIME UPDATE] %s %s confirm=%d（已稳定）",
                     symbol, raw_regime, cached["confirm_count"],
@@ -604,8 +644,8 @@ class SignalHandler:
                 }
 
             logger.info(
-                "[REGIME UPDATE] %s %s confirm=%d/2",
-                symbol, raw_regime, cached["confirm_count"],
+                "[REGIME UPDATE] %s %s confirm=%d/%d",
+                symbol, raw_regime, cached["confirm_count"], min_confirm,
             )
             return None
 
@@ -617,9 +657,9 @@ class SignalHandler:
             "last_update": now,
         }
         logger.info(
-            "[REGIME UPDATE] %s %s -> %s confirm=1/2（切换）",
-            symbol, last_regime, raw_regime,
-        )
+            "[REGIME UPDATE] %s %s -> %s confirm=1/%d（切换）",
+                symbol, last_regime, raw_regime, min_confirm,
+            )
         return None
 
     # ── 执行方法 ─────────────────────────────────────────────

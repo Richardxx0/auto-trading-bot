@@ -6,6 +6,7 @@ Binance 合约交易所客户端（基于 ccxt）。
 import logging
 from typing import Any
 
+import requests
 import ccxt
 
 from config.settings import Config
@@ -18,24 +19,31 @@ class ExchangeClient:
 
     def __init__(self, config: Config):
         self._cfg = config
-        self._exch: ccxt.binanceusdm = self._构建交易所()
+        self._exch = self._构建交易所()
         self._markets_loaded = False
 
     # ── 公开方法 ─────────────────────────────────────────────
 
     def contract_exists(self, symbol: str) -> bool:
         """判断合约是否在 Binance 合约市场可交易。"""
-        self._确保市场已加载()
-        exists = symbol in self._exch.markets
-        logger.info("合约 %s 在 Binance 合约市场%s",
-                     symbol, "存在" if exists else "不存在")
-        return exists
+        try:
+            info = self._exch.fapiPublicGetExchangeInfo()
+            symbols = info.get("symbols", [])
+            exists = any(s.get("symbol") == symbol for s in symbols if s.get("status") == "TRADING")
+            logger.info("合约 %s 在 Binance 合约市场%s",
+                         symbol, "存在" if exists else "不存在")
+            return exists
+        except Exception:
+            return False
 
     def get_current_price(self, symbol: str) -> float | None:
         """获取合约最新标记价格。"""
         try:
-            ticker = self._exch.fetch_ticker(symbol)
-            price = ticker.get("markPrice") or ticker.get("last")
+            self._确保市场已加载()
+            ticker = self._exch.fapiPublicGetTickerPrice(params={"symbol": symbol})
+            if isinstance(ticker, list):
+                ticker = ticker[0] if ticker else {}
+            price = ticker.get("price") or ticker.get("markPrice") or ticker.get("lastPrice")
             if price:
                 logger.info("合约 %s 当前标记价格: %.8f", symbol, price)
                 return float(price)
@@ -54,6 +62,7 @@ class ExchangeClient:
         返回值格式：``[[timestamp, open, high, low, close, volume], ...]``
         """
         try:
+            self._确保市场已加载()
             data = self._exch.fetch_ohlcv(symbol, timeframe=timeframe, limit=limit)
             logger.info("获取 %s K线成功: 周期=%s 条数=%d", symbol, timeframe, len(data))
             return data
@@ -103,9 +112,9 @@ class ExchangeClient:
 # 止损管理方法
     def get_open_positions_count(self) -> int:
         try:
-            positions = self._exch.fetch_positions()
+            positions = self._exch.fapiPrivateV2GetPositionRisk()
             return sum(1 for p in positions
-                      if abs(float(p.get("contracts", 0) or p.get("size", 0))) > 0.001)
+                      if abs(float(p.get("positionAmt", 0) or 0)) > 0.001)
         except Exception:
             return 0
 
@@ -327,21 +336,35 @@ class ExchangeClient:
                     logger.error("%s 止盈挂单失败 %s (price=%s): %s",
                                 tp_label, symbol, tp_price, exc)
 
-    def _构建交易所(self) -> ccxt.binanceusdm:
+    def _构建交易所(self):
         exch = ccxt.binanceusdm({
             "apiKey": self._cfg.binance_api_key,
             "secret": self._cfg.binance_secret_key,
-            "options": {"defaultType": "future"},
+            "options": {
+                "defaultType": "future",
+                "fetchCurrencies": False,
+            },
         })
-        exch.enableRateLimit = True
         if self._cfg.binance_testnet:
-            exch.set_sandbox_mode(True)
-            logger.warning("Binance 合约测试网模式已启用 —— 订单为模拟执行")
+            exch.enable_demo_trading(True)
+            logger.warning("Binance 合约模拟模式已启用 —— 订单为模拟执行")
+        exch.session = requests.Session()
+        exch.session.trust_env = True
+        exch.enableRateLimit = True
         return exch
 
     def _确保市场已加载(self) -> None:
-        if not self._markets_loaded:
-            logger.info("正在从 Binance 合约加载市场数据 ...")
+        if self._markets_loaded:
+            return
+        logger.info("正在从 Binance 合约加载市场数据 ...")
+        try:
             self._exch.load_markets()
-            self._markets_loaded = True
-            logger.info("市场数据加载完成，共 %d 个交易对", len(self._exch.markets))
+        except Exception as exc:
+            logger.error("加载市场数据失败: %s", exc)
+            raise
+        # 验证 markets 是否真正加载
+        for sym in ["BTC/USDT:USDT", "ETH/USDT:USDT"]:
+            if sym not in self._exch.markets:
+                logger.warning("市场数据中未找到参考合约 %s", sym)
+        self._markets_loaded = True
+        logger.info("市场数据加载完成，共 %d 个", len(self._exch.markets))

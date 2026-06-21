@@ -14,7 +14,11 @@ import sys
 from config.settings import load_config
 from src.web_listener import WebSignalListener
 from src.position_monitor import PositionMonitor
+from src.exchange import ExchangeClient
+from core.exchange_service import ExchangeService
 from src.signal_handler import SignalHandler
+from dashboard import event_log as el
+from dashboard import signal_store as ss
 
 
 def 设置日志(cfg) -> None:
@@ -63,14 +67,35 @@ async def 主异步函数() -> None:
     log.info("  止损: %.1f%%  止盈: %.1f%%",
              cfg.stop_loss_pct * 100, cfg.take_profit_pct * 100)
     log.info("=" * 56)
+    log.warning("[TEST MODE] regime_min_confirm_bars=%d (change to 2+ for live)", cfg.regime_min_confirm_bars)
 
-    handler = SignalHandler(cfg)
+    exchange_client = ExchangeClient(cfg)
+    exchange_service = ExchangeService(exchange_client)
+    handler = SignalHandler(cfg, exchange_service)
+
+    async def _on_signal_wrapper(symbol, price, alert_count):
+        el.write("信号", symbol, "价格=" + str(price) + " 第" + str(alert_count) + "次报警")
+        result = await handler.on_web_signal(symbol, price, alert_count)
+        # 同步结果到 signals.json
+        _all = ss.load_all()
+        _target = symbol + "USDT"
+        for _i in range(len(_all)-1, -1, -1):
+            if _all[_i].get("symbol") == _target:
+                _all[_i]["trade_status"] = result
+                if result == "已开单":
+                    el.write("开仓", symbol, "已开仓 价格=" + str(price))
+                elif result == "跳过":
+                    el.write("未开", symbol, "跳过 价格=" + str(price))
+                else:
+                    el.write("未开", symbol, "失败 价格=" + str(price))
+                break
+        ss.save_all(_all)
     listener = WebSignalListener(
         email=cfg.yss_email,
         password=cfg.yss_password,
-        on_signal_callback=handler.on_web_signal,
+        on_signal_callback=_on_signal_wrapper,
     )
-    monitor = PositionMonitor(handler._exchange, cfg)
+    monitor = PositionMonitor(exchange_service, cfg)
 
     # 优雅关闭处理
     关闭事件 = asyncio.Event()
@@ -104,4 +129,5 @@ async def 主异步函数() -> None:
 
 
 if __name__ == "__main__":
+    asyncio.set_event_loop_policy(asyncio.WindowsSelectorEventLoopPolicy())
     asyncio.run(主异步函数())

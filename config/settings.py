@@ -31,7 +31,11 @@ class Config:
     # 是否使用 Binance 合约测试网
     binance_testnet: bool = True
 
-    # ── 交易参数 ──────────────────────────────────────────────
+    # 岸岸 YSS 缃戠鏉＄被
+    yss_email: str = ''
+    yss_password: str = ''
+
+    # 岸岸 浜ゆ槗鍙傛暟 ── 交易参数 ──────────────────────────────────────────────
     # 每笔交易风险比例（0.02 = 账户余额的 2%）
     risk_per_trade: float = 0.02
     # 止损百分比（0.02 = 入场价的 2%）
@@ -70,6 +74,11 @@ class Config:
         "SOL": "SOLUSDT",
         "DOGE": "DOGEUSDT",
     })
+
+    # ═══════════════════════════════════════════════════
+    # ⚠️  测试阶段=1, 生产实盘必须改为2或更高 ⚠️
+    # ═══════════════════════════════════════════════════
+    regime_min_confirm_bars: int = 1
 
     # ── 技术分析参数 ──────────────────────────────
     # K线周期（用于主趋势判断）
@@ -160,6 +169,7 @@ def load_config(env_file: str | None = None) -> Config:
         leverage=int(os.environ.get("LEVERAGE", "5")),
         log_level=os.environ.get("LOG_LEVEL", "INFO"),
         analysis_timeframe=os.environ.get("ANALYSIS_TIMEFRAME", "4h"),
+        regime_min_confirm_bars=int(os.environ.get("REGIME_MIN_CONFIRM_BARS", "1")),
         analysis_ema_fast=int(os.environ.get("ANALYSIS_EMA_FAST", "20")),
         analysis_ema_slow=int(os.environ.get("ANALYSIS_EMA_SLOW", "50")),
         analysis_rsi_period=int(os.environ.get("ANALYSIS_RSI_PERIOD", "14")),
