@@ -250,8 +250,7 @@ class SignalHandler:
             vol_r = analysis.get("vol_ratio", 0)
             if vol_r < self._cfg.volume_min_ratio * vol_mult:
                 logger.info("【成交量过滤】%s vol=%.2f < 最低要求%.2f（力度%d倍），跳过\nanalysis keys: %s",
-                            contract_symbol, vol_r, self._cfg.volume_min_ratio * vol_mult, vol_mult)
-                self._标记去重(contract_symbol)
+                            contract_symbol, vol_r, self._cfg.volume_min_ratio * vol_mult, vol_mult, list(analysis.keys()))
                 return
 
         if analysis.get("error"):
@@ -496,10 +495,7 @@ class SignalHandler:
             vol_r = analysis.get("vol_ratio", 0)
             if vol_r < self._cfg.volume_min_ratio * vol_mult:
                 logger.info("【成交量过滤】%s vol=%.2f < 最低要求%.2f（力度%d個），跳过\nanalysis keys: %s",
-                            contract_symbol, vol_r, self._cfg.volume_min_ratio * vol_mult, vol_mult)
-                return
-
-        if analysis.get("error"):
+                            contract_symbol, vol_r, self._cfg.volume_min_ratio * vol_mult, vol_mult, list(analysis.keys()))
             logger.warning(
                 "【第8步B】技术分析失败（%s），降级为市价开仓",
                 analysis["error"],
