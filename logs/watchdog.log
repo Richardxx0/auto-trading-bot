@@ -1,0 +1,383 @@
+2026-06-23 01:39:13 | WATCHDOG | INFO  | ========================================================
+2026-06-23 01:39:13 | WATCHDOG | INFO  |   自动交易看门狗 启动
+2026-06-23 01:39:13 | WATCHDOG | INFO  |   监控进程: TradingBot, Dashboard
+2026-06-23 01:39:13 | WATCHDOG | INFO  |   最大重启次数: 10/进程
+2026-06-23 01:39:13 | WATCHDOG | INFO  |   检查间隔: 5s
+2026-06-23 01:39:13 | WATCHDOG | INFO  |   日志文件: C:\Users\Richard\Documents\New project\auto-trading-bot\logs\watchdog.log
+2026-06-23 01:39:13 | WATCHDOG | INFO  | ========================================================
+2026-06-23 01:39:13 | WATCHDOG | INFO  | [TradingBot] 启动命令: C:\Users\Richard\AppData\Local\Programs\Python\Python312\python.exe main.py (第 1 次尝试)
+2026-06-23 01:39:13 | WATCHDOG | INFO  | [Dashboard] 启动命令: C:\Users\Richard\AppData\Local\Programs\Python\Python312\python.exe -m dashboard.app (第 1 次尝试)
+2026-06-23 01:39:14 | WATCHDOG | INFO  | Failed to load SSL library: <class 'OSError'> (no library called "ssl" found)
+2026-06-23 01:39:14 | WATCHDOG | INFO  | cryptg detected, it will be used for encryption
+2026-06-23 01:39:15 | WATCHDOG | INFO  | 从 C:\Users\Richard\Documents\New project\auto-trading-bot\.env 加载环境变量
+2026-06-23 01:39:15 | WATCHDOG | WARNING | Binance 合约模拟模式已启用 —— 订单为模拟执行
+2026-06-23 01:39:15 | WATCHDOG | INFO  | [31m[1mWARNING: This is a development server. Do not use it in a production deployment. Use a production WSGI server instead.[0m
+ * Running on http://127.0.0.1:5000
+2026-06-23 01:39:15 | WATCHDOG | INFO  | [33mPress CTRL+C to quit[0m
+2026-06-23 01:39:39 | WATCHDOG | INFO  | 127.0.0.1 - - [23/Jun/2026 01:39:39] "GET / HTTP/1.1" 200 -
+2026-06-23 01:39:39 | WATCHDOG | INFO  | 127.0.0.1 - - [23/Jun/2026 01:39:39] "GET /socket.io/?EIO=4&transport=polling&t=PxmQfmo HTTP/1.1" 200 -
+2026-06-23 01:39:39 | WATCHDOG | INFO  | 127.0.0.1 - - [23/Jun/2026 01:39:39] "GET /api/signals HTTP/1.1" 200 -
+2026-06-23 01:39:39 | WATCHDOG | INFO  | 127.0.0.1 - - [23/Jun/2026 01:39:39] "POST /socket.io/?EIO=4&transport=polling&t=PxmQfn_&sid=a3Q3rcFMIByfWwlGAAAA HTTP/1.1" 200 -
+2026-06-23 01:39:39 | WATCHDOG | INFO  | 127.0.0.1 - - [23/Jun/2026 01:39:39] "GET /socket.io/?EIO=4&transport=polling&t=PxmQfo0&sid=a3Q3rcFMIByfWwlGAAAA HTTP/1.1" 200 -
+2026-06-23 01:39:39 | WATCHDOG | INFO  | 127.0.0.1 - - [23/Jun/2026 01:39:39] "GET /socket.io/?EIO=4&transport=polling&t=PxmQfop&sid=a3Q3rcFMIByfWwlGAAAA HTTP/1.1" 200 -
+2026-06-23 01:39:39 | WATCHDOG | INFO  | 127.0.0.1 - - [23/Jun/2026 01:39:39] "[33mGET /favicon.ico HTTP/1.1[0m" 404 -
+2026-06-23 01:39:39 | WATCHDOG | INFO  | 127.0.0.1 - - [23/Jun/2026 01:39:39] "GET /api/data HTTP/1.1" 200 -
+2026-06-23 01:39:39 | WATCHDOG | INFO  | 127.0.0.1 - - [23/Jun/2026 01:39:39] "GET /api/account HTTP/1.1" 200 -
+2026-06-23 01:39:44 | WATCHDOG | INFO  | 127.0.0.1 - - [23/Jun/2026 01:39:44] "GET /api/signals HTTP/1.1" 200 -
+2026-06-23 01:39:44 | WATCHDOG | INFO  | 127.0.0.1 - - [23/Jun/2026 01:39:44] "GET /api/data HTTP/1.1" 200 -
+2026-06-23 01:39:44 | WATCHDOG | INFO  | 127.0.0.1 - - [23/Jun/2026 01:39:44] "GET /api/account HTTP/1.1" 200 -
+2026-06-23 01:39:46 | WATCHDOG | INFO  | 127.0.0.1 - - [23/Jun/2026 01:39:46] "GET /socket.io/?EIO=4&transport=websocket&sid=a3Q3rcFMIByfWwlGAAAA HTTP/1.1" 200 -
+2026-06-23 01:43:32 | WATCHDOG | INFO  | ========================================================
+2026-06-23 01:43:32 | WATCHDOG | INFO  |   自动交易看门狗 启动
+2026-06-23 01:43:32 | WATCHDOG | INFO  |   监控进程: TradingBot, Dashboard
+2026-06-23 01:43:32 | WATCHDOG | INFO  |   最大重启次数: 10/进程
+2026-06-23 01:43:32 | WATCHDOG | INFO  |   检查间隔: 5s
+2026-06-23 01:43:32 | WATCHDOG | INFO  |   日志文件: C:\Users\Richard\Documents\New project\auto-trading-bot\logs\watchdog.log
+2026-06-23 01:43:32 | WATCHDOG | INFO  | ========================================================
+2026-06-23 01:43:32 | WATCHDOG | INFO  | [TradingBot] 启动命令: C:\Users\Richard\AppData\Local\Programs\Python\Python312\python.exe main.py (第 1 次尝试)
+2026-06-23 01:43:32 | WATCHDOG | INFO  | [Dashboard] 启动命令: C:\Users\Richard\AppData\Local\Programs\Python\Python312\python.exe -m dashboard.app (第 1 次尝试)
+2026-06-23 01:43:33 | WATCHDOG | INFO  | Failed to load SSL library: <class 'OSError'> (no library called "ssl" found)
+2026-06-23 01:43:33 | WATCHDOG | INFO  | cryptg detected, it will be used for encryption
+2026-06-23 01:43:33 | WATCHDOG | INFO  | 从 C:\Users\Richard\Documents\New project\auto-trading-bot\.env 加载环境变量
+2026-06-23 01:43:33 | WATCHDOG | WARNING | Binance 合约模拟模式已启用 —— 订单为模拟执行
+2026-06-23 01:43:33 | WATCHDOG | INFO  | [31m[1mWARNING: This is a development server. Do not use it in a production deployment. Use a production WSGI server instead.[0m
+ * Running on http://127.0.0.1:5000
+2026-06-23 01:43:33 | WATCHDOG | INFO  | [33mPress CTRL+C to quit[0m
+2026-06-23 01:46:56 | WATCHDOG | INFO  | ========================================================
+2026-06-23 01:46:56 | WATCHDOG | INFO  |   自动交易看门狗 启动
+2026-06-23 01:46:56 | WATCHDOG | INFO  |   监控进程: TradingBot, Dashboard
+2026-06-23 01:46:56 | WATCHDOG | INFO  |   最大重启次数: 10/进程
+2026-06-23 01:46:56 | WATCHDOG | INFO  |   检查间隔: 5s
+2026-06-23 01:46:56 | WATCHDOG | INFO  |   日志文件: C:\Users\Richard\Documents\New project\auto-trading-bot\logs\watchdog.log
+2026-06-23 01:46:56 | WATCHDOG | INFO  | ========================================================
+2026-06-23 01:46:56 | WATCHDOG | INFO  | [TradingBot] 启动命令: C:\Users\Richard\AppData\Local\Programs\Python\Python312\python.exe main.py (第 1 次尝试)
+2026-06-23 01:46:56 | WATCHDOG | INFO  | [Dashboard] 启动命令: C:\Users\Richard\AppData\Local\Programs\Python\Python312\python.exe -m dashboard.app (第 1 次尝试)
+2026-06-23 01:46:56 | WATCHDOG | INFO  | Failed to load SSL library: <class 'OSError'> (no library called "ssl" found)
+2026-06-23 01:46:56 | WATCHDOG | INFO  | cryptg detected, it will be used for encryption
+2026-06-23 01:46:57 | WATCHDOG | INFO  | 从 C:\Users\Richard\Documents\New project\auto-trading-bot\.env 加载环境变量
+2026-06-23 01:46:57 | WATCHDOG | WARNING | Binance 合约模拟模式已启用 —— 订单为模拟执行
+2026-06-23 01:46:57 | WATCHDOG | INFO  | [31m[1mWARNING: This is a development server. Do not use it in a production deployment. Use a production WSGI server instead.[0m
+ * Running on http://127.0.0.1:5000
+2026-06-23 01:46:57 | WATCHDOG | INFO  | [33mPress CTRL+C to quit[0m
+2026-06-23 01:50:07 | WATCHDOG | INFO  | 收到关闭信号，正在停止所有子进程...
+2026-06-23 01:50:07 | WATCHDOG | INFO  | [TradingBot] 正在关闭 (PID=7364)...
+2026-06-23 01:50:07 | WATCHDOG | INFO  | [Dashboard] 正在关闭 (PID=10264)...
+2026-06-23 01:50:07 | WATCHDOG | INFO  | 看门狗已退出
+2026-06-23 01:50:10 | WATCHDOG | INFO  | ========================================================
+2026-06-23 01:50:10 | WATCHDOG | INFO  |   自动交易看门狗 启动
+2026-06-23 01:50:10 | WATCHDOG | INFO  |   监控进程: Dashboard, TradingBot
+2026-06-23 01:50:10 | WATCHDOG | INFO  |   启动顺序: Dashboard -> TradingBot (间隔 3s)
+2026-06-23 01:50:10 | WATCHDOG | INFO  |   最大重启次数: 10/进程
+2026-06-23 01:50:10 | WATCHDOG | INFO  |   检查间隔: 5s
+2026-06-23 01:50:10 | WATCHDOG | INFO  |   日志文件: C:\Users\Richard\Documents\New project\auto-trading-bot\logs\watchdog.log
+2026-06-23 01:50:10 | WATCHDOG | INFO  |   子进程日志: logs/trading_bot.log, logs/dashboard.log
+2026-06-23 01:50:10 | WATCHDOG | INFO  |   使用 --verbose 显示子进程日志到终端
+2026-06-23 01:50:10 | WATCHDOG | INFO  | ========================================================
+2026-06-23 01:50:10 | WATCHDOG | INFO  | [Dashboard] 启动命令: C:\Users\Richard\AppData\Local\Programs\Python\Python312\python.exe -m dashboard.app (第 1 次尝试)
+2026-06-23 01:50:10 | WATCHDOG | INFO  | 等待 3 秒后启动 TradingBot...
+2026-06-23 01:50:11 | WATCHDOG | INFO  | Failed to load SSL library: <class 'OSError'> (no library called "ssl" found)
+2026-06-23 01:50:11 | WATCHDOG | INFO  | cryptg detected, it will be used for encryption
+2026-06-23 01:50:11 | WATCHDOG | INFO  | 从 C:\Users\Richard\Documents\New project\auto-trading-bot\.env 加载环境变量
+2026-06-23 01:50:11 | WATCHDOG | WARNING | Binance 合约模拟模式已启用 —— 订单为模拟执行
+2026-06-23 01:50:11 | WATCHDOG | INFO  | [31m[1mWARNING: This is a development server. Do not use it in a production deployment. Use a production WSGI server instead.[0m
+ * Running on http://127.0.0.1:5000
+2026-06-23 01:50:11 | WATCHDOG | INFO  | [33mPress CTRL+C to quit[0m
+2026-06-23 01:50:13 | WATCHDOG | INFO  | [TradingBot] 启动命令: C:\Users\Richard\AppData\Local\Programs\Python\Python312\python.exe main.py (第 1 次尝试)
+2026-06-23 02:30:44 | WATCHDOG | INFO  | 127.0.0.1 - - [23/Jun/2026 02:30:44] "GET / HTTP/1.1" 200 -
+2026-06-23 02:30:44 | WATCHDOG | INFO  | 127.0.0.1 - - [23/Jun/2026 02:30:44] "GET /socket.io/?EIO=4&transport=polling&t=PxmcM4J HTTP/1.1" 200 -
+2026-06-23 02:30:44 | WATCHDOG | INFO  | 127.0.0.1 - - [23/Jun/2026 02:30:44] "GET /api/signals HTTP/1.1" 200 -
+2026-06-23 02:30:44 | WATCHDOG | INFO  | 127.0.0.1 - - [23/Jun/2026 02:30:44] "POST /socket.io/?EIO=4&transport=polling&t=PxmcM5L&sid=f0_TxzZAFtJsdNKOAAAC HTTP/1.1" 200 -
+2026-06-23 02:30:44 | WATCHDOG | INFO  | 127.0.0.1 - - [23/Jun/2026 02:30:44] "GET /socket.io/?EIO=4&transport=polling&t=PxmcM5M&sid=f0_TxzZAFtJsdNKOAAAC HTTP/1.1" 200 -
+2026-06-23 02:30:44 | WATCHDOG | INFO  | 127.0.0.1 - - [23/Jun/2026 02:30:44] "GET /socket.io/?EIO=4&transport=polling&t=PxmcM5W&sid=f0_TxzZAFtJsdNKOAAAC HTTP/1.1" 200 -
+2026-06-23 02:30:44 | WATCHDOG | INFO  | 127.0.0.1 - - [23/Jun/2026 02:30:44] "GET /socket.io/?EIO=4&transport=polling&t=PxmcM5s&sid=f0_TxzZAFtJsdNKOAAAC HTTP/1.1" 200 -
+2026-06-23 02:30:44 | WATCHDOG | INFO  | 127.0.0.1 - - [23/Jun/2026 02:30:44] "GET /api/account HTTP/1.1" 200 -
+2026-06-23 02:30:44 | WATCHDOG | INFO  | 127.0.0.1 - - [23/Jun/2026 02:30:44] "GET /api/data HTTP/1.1" 200 -
+2026-06-23 02:30:49 | WATCHDOG | INFO  | 127.0.0.1 - - [23/Jun/2026 02:30:49] "GET /api/signals HTTP/1.1" 200 -
+2026-06-23 02:30:49 | WATCHDOG | INFO  | 127.0.0.1 - - [23/Jun/2026 02:30:49] "GET /api/data HTTP/1.1" 200 -
+2026-06-23 02:30:49 | WATCHDOG | INFO  | 127.0.0.1 - - [23/Jun/2026 02:30:49] "GET /api/account HTTP/1.1" 200 -
+2026-06-23 02:30:54 | WATCHDOG | INFO  | 127.0.0.1 - - [23/Jun/2026 02:30:54] "GET /api/signals HTTP/1.1" 200 -
+2026-06-23 02:30:54 | WATCHDOG | INFO  | 127.0.0.1 - - [23/Jun/2026 02:30:54] "GET /api/data HTTP/1.1" 200 -
+2026-06-23 02:30:54 | WATCHDOG | INFO  | 127.0.0.1 - - [23/Jun/2026 02:30:54] "GET /api/account HTTP/1.1" 200 -
+2026-06-23 02:31:00 | WATCHDOG | INFO  | 127.0.0.1 - - [23/Jun/2026 02:31:00] "GET /api/signals HTTP/1.1" 200 -
+2026-06-23 02:31:00 | WATCHDOG | INFO  | 127.0.0.1 - - [23/Jun/2026 02:31:00] "GET /api/data HTTP/1.1" 200 -
+2026-06-23 02:31:00 | WATCHDOG | INFO  | 127.0.0.1 - - [23/Jun/2026 02:31:00] "GET /api/account HTTP/1.1" 200 -
+2026-06-23 02:31:05 | WATCHDOG | INFO  | 127.0.0.1 - - [23/Jun/2026 02:31:05] "GET /api/signals HTTP/1.1" 200 -
+2026-06-23 02:31:05 | WATCHDOG | INFO  | 127.0.0.1 - - [23/Jun/2026 02:31:05] "GET /api/data HTTP/1.1" 200 -
+2026-06-23 02:31:05 | WATCHDOG | INFO  | 127.0.0.1 - - [23/Jun/2026 02:31:05] "GET /api/account HTTP/1.1" 200 -
+2026-06-23 02:31:10 | WATCHDOG | INFO  | 127.0.0.1 - - [23/Jun/2026 02:31:10] "GET /api/signals HTTP/1.1" 200 -
+2026-06-23 02:31:10 | WATCHDOG | INFO  | 127.0.0.1 - - [23/Jun/2026 02:31:10] "GET /api/data HTTP/1.1" 200 -
+2026-06-23 02:31:10 | WATCHDOG | INFO  | 127.0.0.1 - - [23/Jun/2026 02:31:10] "GET /api/account HTTP/1.1" 200 -
+2026-06-23 02:31:15 | WATCHDOG | INFO  | 127.0.0.1 - - [23/Jun/2026 02:31:15] "GET /api/signals HTTP/1.1" 200 -
+2026-06-23 02:31:15 | WATCHDOG | INFO  | 127.0.0.1 - - [23/Jun/2026 02:31:15] "GET /api/data HTTP/1.1" 200 -
+2026-06-23 02:31:15 | WATCHDOG | INFO  | 127.0.0.1 - - [23/Jun/2026 02:31:15] "GET /api/account HTTP/1.1" 200 -
+2026-06-23 02:31:20 | WATCHDOG | INFO  | 127.0.0.1 - - [23/Jun/2026 02:31:20] "GET /api/signals HTTP/1.1" 200 -
+2026-06-23 02:31:20 | WATCHDOG | INFO  | 127.0.0.1 - - [23/Jun/2026 02:31:20] "GET /api/data HTTP/1.1" 200 -
+2026-06-23 02:31:20 | WATCHDOG | INFO  | 127.0.0.1 - - [23/Jun/2026 02:31:20] "GET /api/account HTTP/1.1" 200 -
+2026-06-23 02:31:25 | WATCHDOG | INFO  | 127.0.0.1 - - [23/Jun/2026 02:31:25] "GET /api/signals HTTP/1.1" 200 -
+2026-06-23 02:31:25 | WATCHDOG | INFO  | 127.0.0.1 - - [23/Jun/2026 02:31:25] "GET /api/data HTTP/1.1" 200 -
+2026-06-23 02:31:25 | WATCHDOG | INFO  | 127.0.0.1 - - [23/Jun/2026 02:31:25] "GET /api/account HTTP/1.1" 200 -
+2026-06-23 02:31:30 | WATCHDOG | INFO  | 127.0.0.1 - - [23/Jun/2026 02:31:30] "GET /api/signals HTTP/1.1" 200 -
+2026-06-23 02:31:30 | WATCHDOG | INFO  | 127.0.0.1 - - [23/Jun/2026 02:31:30] "GET /api/data HTTP/1.1" 200 -
+2026-06-23 02:31:30 | WATCHDOG | INFO  | 127.0.0.1 - - [23/Jun/2026 02:31:30] "GET /api/account HTTP/1.1" 200 -
+2026-06-23 02:31:35 | WATCHDOG | INFO  | 127.0.0.1 - - [23/Jun/2026 02:31:35] "GET /api/signals HTTP/1.1" 200 -
+2026-06-23 02:31:35 | WATCHDOG | INFO  | 127.0.0.1 - - [23/Jun/2026 02:31:35] "GET /api/data HTTP/1.1" 200 -
+2026-06-23 02:31:35 | WATCHDOG | INFO  | 127.0.0.1 - - [23/Jun/2026 02:31:35] "GET /api/account HTTP/1.1" 200 -
+2026-06-23 02:31:40 | WATCHDOG | INFO  | 127.0.0.1 - - [23/Jun/2026 02:31:40] "GET /api/signals HTTP/1.1" 200 -
+2026-06-23 02:31:40 | WATCHDOG | INFO  | 127.0.0.1 - - [23/Jun/2026 02:31:40] "GET /api/data HTTP/1.1" 200 -
+2026-06-23 02:31:40 | WATCHDOG | INFO  | 127.0.0.1 - - [23/Jun/2026 02:31:40] "GET /api/account HTTP/1.1" 200 -
+2026-06-23 02:31:45 | WATCHDOG | INFO  | 127.0.0.1 - - [23/Jun/2026 02:31:45] "GET /api/signals HTTP/1.1" 200 -
+2026-06-23 02:31:45 | WATCHDOG | INFO  | 127.0.0.1 - - [23/Jun/2026 02:31:45] "GET /api/data HTTP/1.1" 200 -
+2026-06-23 02:31:45 | WATCHDOG | INFO  | 127.0.0.1 - - [23/Jun/2026 02:31:45] "GET /api/account HTTP/1.1" 200 -
+2026-06-23 02:31:50 | WATCHDOG | INFO  | 127.0.0.1 - - [23/Jun/2026 02:31:50] "GET /api/signals HTTP/1.1" 200 -
+2026-06-23 02:31:50 | WATCHDOG | INFO  | 127.0.0.1 - - [23/Jun/2026 02:31:50] "GET /api/data HTTP/1.1" 200 -
+2026-06-23 02:31:50 | WATCHDOG | INFO  | 127.0.0.1 - - [23/Jun/2026 02:31:50] "GET /api/account HTTP/1.1" 200 -
+2026-06-23 02:31:55 | WATCHDOG | INFO  | 127.0.0.1 - - [23/Jun/2026 02:31:55] "GET /api/signals HTTP/1.1" 200 -
+2026-06-23 02:31:55 | WATCHDOG | INFO  | 127.0.0.1 - - [23/Jun/2026 02:31:55] "GET /api/data HTTP/1.1" 200 -
+2026-06-23 02:31:55 | WATCHDOG | INFO  | 127.0.0.1 - - [23/Jun/2026 02:31:55] "GET /api/account HTTP/1.1" 200 -
+2026-06-23 02:32:00 | WATCHDOG | INFO  | 127.0.0.1 - - [23/Jun/2026 02:32:00] "GET /api/signals HTTP/1.1" 200 -
+2026-06-23 02:32:00 | WATCHDOG | INFO  | 127.0.0.1 - - [23/Jun/2026 02:32:00] "GET /api/data HTTP/1.1" 200 -
+2026-06-23 02:32:00 | WATCHDOG | INFO  | 127.0.0.1 - - [23/Jun/2026 02:32:00] "GET /api/account HTTP/1.1" 200 -
+2026-06-23 02:32:05 | WATCHDOG | INFO  | 127.0.0.1 - - [23/Jun/2026 02:32:05] "GET /api/signals HTTP/1.1" 200 -
+2026-06-23 02:32:05 | WATCHDOG | INFO  | 127.0.0.1 - - [23/Jun/2026 02:32:05] "GET /api/account HTTP/1.1" 200 -
+2026-06-23 02:32:05 | WATCHDOG | INFO  | 127.0.0.1 - - [23/Jun/2026 02:32:05] "GET /api/data HTTP/1.1" 200 -
+2026-06-23 02:32:10 | WATCHDOG | INFO  | 127.0.0.1 - - [23/Jun/2026 02:32:10] "GET /api/signals HTTP/1.1" 200 -
+2026-06-23 02:32:10 | WATCHDOG | INFO  | 127.0.0.1 - - [23/Jun/2026 02:32:10] "GET /api/data HTTP/1.1" 200 -
+2026-06-23 02:32:10 | WATCHDOG | INFO  | 127.0.0.1 - - [23/Jun/2026 02:32:10] "GET /api/account HTTP/1.1" 200 -
+2026-06-23 02:32:15 | WATCHDOG | INFO  | 127.0.0.1 - - [23/Jun/2026 02:32:15] "GET /api/signals HTTP/1.1" 200 -
+2026-06-23 02:32:15 | WATCHDOG | INFO  | 127.0.0.1 - - [23/Jun/2026 02:32:15] "GET /api/account HTTP/1.1" 200 -
+2026-06-23 02:32:15 | WATCHDOG | INFO  | 127.0.0.1 - - [23/Jun/2026 02:32:15] "GET /api/data HTTP/1.1" 200 -
+2026-06-23 02:32:20 | WATCHDOG | INFO  | 127.0.0.1 - - [23/Jun/2026 02:32:20] "GET /api/signals HTTP/1.1" 200 -
+2026-06-23 02:32:20 | WATCHDOG | INFO  | 127.0.0.1 - - [23/Jun/2026 02:32:20] "GET /api/data HTTP/1.1" 200 -
+2026-06-23 02:32:20 | WATCHDOG | INFO  | 127.0.0.1 - - [23/Jun/2026 02:32:20] "GET /api/account HTTP/1.1" 200 -
+2026-06-23 02:32:25 | WATCHDOG | INFO  | 127.0.0.1 - - [23/Jun/2026 02:32:25] "GET /api/signals HTTP/1.1" 200 -
+2026-06-23 02:32:25 | WATCHDOG | INFO  | 127.0.0.1 - - [23/Jun/2026 02:32:25] "GET /api/data HTTP/1.1" 200 -
+2026-06-23 02:32:25 | WATCHDOG | INFO  | 127.0.0.1 - - [23/Jun/2026 02:32:25] "GET /api/account HTTP/1.1" 200 -
+2026-06-23 02:32:30 | WATCHDOG | INFO  | 127.0.0.1 - - [23/Jun/2026 02:32:30] "GET /api/signals HTTP/1.1" 200 -
+2026-06-23 02:32:30 | WATCHDOG | INFO  | 127.0.0.1 - - [23/Jun/2026 02:32:30] "GET /api/data HTTP/1.1" 200 -
+2026-06-23 02:32:30 | WATCHDOG | INFO  | 127.0.0.1 - - [23/Jun/2026 02:32:30] "GET /api/account HTTP/1.1" 200 -
+2026-06-23 02:32:35 | WATCHDOG | INFO  | 127.0.0.1 - - [23/Jun/2026 02:32:35] "GET /api/signals HTTP/1.1" 200 -
+2026-06-23 02:32:35 | WATCHDOG | INFO  | 127.0.0.1 - - [23/Jun/2026 02:32:35] "GET /api/data HTTP/1.1" 200 -
+2026-06-23 02:32:35 | WATCHDOG | INFO  | 127.0.0.1 - - [23/Jun/2026 02:32:35] "GET /api/account HTTP/1.1" 200 -
+2026-06-23 02:32:40 | WATCHDOG | INFO  | 127.0.0.1 - - [23/Jun/2026 02:32:40] "GET /api/signals HTTP/1.1" 200 -
+2026-06-23 02:32:40 | WATCHDOG | INFO  | 127.0.0.1 - - [23/Jun/2026 02:32:40] "GET /api/data HTTP/1.1" 200 -
+2026-06-23 02:32:40 | WATCHDOG | INFO  | 127.0.0.1 - - [23/Jun/2026 02:32:40] "GET /api/account HTTP/1.1" 200 -
+2026-06-23 02:32:45 | WATCHDOG | INFO  | 127.0.0.1 - - [23/Jun/2026 02:32:45] "GET /api/signals HTTP/1.1" 200 -
+2026-06-23 02:32:45 | WATCHDOG | INFO  | 127.0.0.1 - - [23/Jun/2026 02:32:45] "GET /api/data HTTP/1.1" 200 -
+2026-06-23 02:32:45 | WATCHDOG | INFO  | 127.0.0.1 - - [23/Jun/2026 02:32:45] "GET /api/account HTTP/1.1" 200 -
+2026-06-23 02:32:50 | WATCHDOG | INFO  | 127.0.0.1 - - [23/Jun/2026 02:32:50] "GET /api/signals HTTP/1.1" 200 -
+2026-06-23 02:32:50 | WATCHDOG | INFO  | 127.0.0.1 - - [23/Jun/2026 02:32:50] "GET /api/data HTTP/1.1" 200 -
+2026-06-23 02:32:50 | WATCHDOG | INFO  | 127.0.0.1 - - [23/Jun/2026 02:32:50] "GET /api/account HTTP/1.1" 200 -
+2026-06-23 02:33:05 | WATCHDOG | INFO  | 127.0.0.1 - - [23/Jun/2026 02:33:05] "GET /api/signals HTTP/1.1" 200 -
+2026-06-23 02:33:05 | WATCHDOG | INFO  | 127.0.0.1 - - [23/Jun/2026 02:33:05] "GET /api/data HTTP/1.1" 200 -
+2026-06-23 02:33:05 | WATCHDOG | INFO  | 127.0.0.1 - - [23/Jun/2026 02:33:05] "GET /api/account HTTP/1.1" 200 -
+2026-06-23 02:34:05 | WATCHDOG | INFO  | 127.0.0.1 - - [23/Jun/2026 02:34:05] "GET /api/signals HTTP/1.1" 200 -
+2026-06-23 02:34:05 | WATCHDOG | INFO  | 127.0.0.1 - - [23/Jun/2026 02:34:05] "GET /api/data HTTP/1.1" 200 -
+2026-06-23 02:34:05 | WATCHDOG | INFO  | 127.0.0.1 - - [23/Jun/2026 02:34:05] "GET /api/account HTTP/1.1" 200 -
+2026-06-23 02:35:05 | WATCHDOG | INFO  | 127.0.0.1 - - [23/Jun/2026 02:35:05] "GET /api/signals HTTP/1.1" 200 -
+2026-06-23 02:35:05 | WATCHDOG | INFO  | 127.0.0.1 - - [23/Jun/2026 02:35:05] "GET /api/data HTTP/1.1" 200 -
+2026-06-23 02:35:05 | WATCHDOG | INFO  | 127.0.0.1 - - [23/Jun/2026 02:35:05] "GET /api/account HTTP/1.1" 200 -
+2026-06-23 02:36:04 | WATCHDOG | INFO  | 127.0.0.1 - - [23/Jun/2026 02:36:04] "GET /api/signals HTTP/1.1" 200 -
+2026-06-23 02:36:04 | WATCHDOG | INFO  | 127.0.0.1 - - [23/Jun/2026 02:36:04] "GET /api/data HTTP/1.1" 200 -
+2026-06-23 02:36:04 | WATCHDOG | INFO  | 127.0.0.1 - - [23/Jun/2026 02:36:04] "GET /api/account HTTP/1.1" 200 -
+2026-06-23 02:36:10 | WATCHDOG | INFO  | 127.0.0.1 - - [23/Jun/2026 02:36:10] "GET /api/signals HTTP/1.1" 200 -
+2026-06-23 02:36:10 | WATCHDOG | INFO  | 127.0.0.1 - - [23/Jun/2026 02:36:10] "GET /api/data HTTP/1.1" 200 -
+2026-06-23 02:36:10 | WATCHDOG | INFO  | 127.0.0.1 - - [23/Jun/2026 02:36:10] "GET /api/account HTTP/1.1" 200 -
+2026-06-23 02:36:15 | WATCHDOG | INFO  | 127.0.0.1 - - [23/Jun/2026 02:36:15] "GET /api/signals HTTP/1.1" 200 -
+2026-06-23 02:36:15 | WATCHDOG | INFO  | 127.0.0.1 - - [23/Jun/2026 02:36:15] "GET /api/data HTTP/1.1" 200 -
+2026-06-23 02:36:15 | WATCHDOG | INFO  | 127.0.0.1 - - [23/Jun/2026 02:36:15] "GET /api/account HTTP/1.1" 200 -
+2026-06-23 02:36:20 | WATCHDOG | INFO  | 127.0.0.1 - - [23/Jun/2026 02:36:20] "GET /api/signals HTTP/1.1" 200 -
+2026-06-23 02:36:20 | WATCHDOG | INFO  | 127.0.0.1 - - [23/Jun/2026 02:36:20] "GET /api/data HTTP/1.1" 200 -
+2026-06-23 02:36:20 | WATCHDOG | INFO  | 127.0.0.1 - - [23/Jun/2026 02:36:20] "GET /api/account HTTP/1.1" 200 -
+2026-06-23 02:36:25 | WATCHDOG | INFO  | 127.0.0.1 - - [23/Jun/2026 02:36:25] "GET /api/signals HTTP/1.1" 200 -
+2026-06-23 02:36:25 | WATCHDOG | INFO  | 127.0.0.1 - - [23/Jun/2026 02:36:25] "GET /api/data HTTP/1.1" 200 -
+2026-06-23 02:36:25 | WATCHDOG | INFO  | 127.0.0.1 - - [23/Jun/2026 02:36:25] "GET /api/account HTTP/1.1" 200 -
+2026-06-23 02:36:30 | WATCHDOG | INFO  | 127.0.0.1 - - [23/Jun/2026 02:36:30] "GET /api/signals HTTP/1.1" 200 -
+2026-06-23 02:36:30 | WATCHDOG | INFO  | 127.0.0.1 - - [23/Jun/2026 02:36:30] "GET /api/data HTTP/1.1" 200 -
+2026-06-23 02:36:30 | WATCHDOG | INFO  | 127.0.0.1 - - [23/Jun/2026 02:36:30] "GET /api/account HTTP/1.1" 200 -
+2026-06-23 02:36:35 | WATCHDOG | INFO  | 127.0.0.1 - - [23/Jun/2026 02:36:35] "GET /api/signals HTTP/1.1" 200 -
+2026-06-23 02:36:35 | WATCHDOG | INFO  | 127.0.0.1 - - [23/Jun/2026 02:36:35] "GET /api/data HTTP/1.1" 200 -
+2026-06-23 02:36:35 | WATCHDOG | INFO  | 127.0.0.1 - - [23/Jun/2026 02:36:35] "GET /api/account HTTP/1.1" 200 -
+2026-06-23 02:36:40 | WATCHDOG | INFO  | 127.0.0.1 - - [23/Jun/2026 02:36:40] "GET /api/signals HTTP/1.1" 200 -
+2026-06-23 02:36:40 | WATCHDOG | INFO  | 127.0.0.1 - - [23/Jun/2026 02:36:40] "GET /api/data HTTP/1.1" 200 -
+2026-06-23 02:36:40 | WATCHDOG | INFO  | 127.0.0.1 - - [23/Jun/2026 02:36:40] "GET /api/account HTTP/1.1" 200 -
+2026-06-23 02:36:45 | WATCHDOG | INFO  | 127.0.0.1 - - [23/Jun/2026 02:36:45] "GET /api/signals HTTP/1.1" 200 -
+2026-06-23 02:36:45 | WATCHDOG | INFO  | 127.0.0.1 - - [23/Jun/2026 02:36:45] "GET /api/data HTTP/1.1" 200 -
+2026-06-23 02:36:45 | WATCHDOG | INFO  | 127.0.0.1 - - [23/Jun/2026 02:36:45] "GET /api/account HTTP/1.1" 200 -
+2026-06-23 02:36:50 | WATCHDOG | INFO  | 127.0.0.1 - - [23/Jun/2026 02:36:50] "GET /api/signals HTTP/1.1" 200 -
+2026-06-23 02:36:50 | WATCHDOG | INFO  | 127.0.0.1 - - [23/Jun/2026 02:36:50] "GET /api/data HTTP/1.1" 200 -
+2026-06-23 02:36:50 | WATCHDOG | INFO  | 127.0.0.1 - - [23/Jun/2026 02:36:50] "GET /api/account HTTP/1.1" 200 -
+2026-06-23 02:36:55 | WATCHDOG | INFO  | 127.0.0.1 - - [23/Jun/2026 02:36:55] "GET /api/signals HTTP/1.1" 200 -
+2026-06-23 02:36:55 | WATCHDOG | INFO  | 127.0.0.1 - - [23/Jun/2026 02:36:55] "GET /api/data HTTP/1.1" 200 -
+2026-06-23 02:36:55 | WATCHDOG | INFO  | 127.0.0.1 - - [23/Jun/2026 02:36:55] "GET /api/account HTTP/1.1" 200 -
+2026-06-23 02:37:00 | WATCHDOG | INFO  | 127.0.0.1 - - [23/Jun/2026 02:37:00] "GET /api/signals HTTP/1.1" 200 -
+2026-06-23 02:37:00 | WATCHDOG | INFO  | 127.0.0.1 - - [23/Jun/2026 02:37:00] "GET /api/data HTTP/1.1" 200 -
+2026-06-23 02:37:00 | WATCHDOG | INFO  | 127.0.0.1 - - [23/Jun/2026 02:37:00] "GET /api/account HTTP/1.1" 200 -
+2026-06-23 02:37:05 | WATCHDOG | INFO  | 127.0.0.1 - - [23/Jun/2026 02:37:05] "GET /api/signals HTTP/1.1" 200 -
+2026-06-23 02:37:05 | WATCHDOG | INFO  | 127.0.0.1 - - [23/Jun/2026 02:37:05] "GET /api/account HTTP/1.1" 200 -
+2026-06-23 02:37:05 | WATCHDOG | INFO  | 127.0.0.1 - - [23/Jun/2026 02:37:05] "GET /api/data HTTP/1.1" 200 -
+2026-06-23 02:38:05 | WATCHDOG | INFO  | 127.0.0.1 - - [23/Jun/2026 02:38:05] "GET /api/signals HTTP/1.1" 200 -
+2026-06-23 02:38:05 | WATCHDOG | INFO  | 127.0.0.1 - - [23/Jun/2026 02:38:05] "GET /api/data HTTP/1.1" 200 -
+2026-06-23 02:38:05 | WATCHDOG | INFO  | 127.0.0.1 - - [23/Jun/2026 02:38:05] "GET /api/account HTTP/1.1" 200 -
+2026-06-23 02:39:05 | WATCHDOG | INFO  | 127.0.0.1 - - [23/Jun/2026 02:39:05] "GET /api/signals HTTP/1.1" 200 -
+2026-06-23 02:39:05 | WATCHDOG | INFO  | 127.0.0.1 - - [23/Jun/2026 02:39:05] "GET /api/data HTTP/1.1" 200 -
+2026-06-23 02:39:05 | WATCHDOG | INFO  | 127.0.0.1 - - [23/Jun/2026 02:39:05] "GET /api/account HTTP/1.1" 200 -
+2026-06-23 02:40:05 | WATCHDOG | INFO  | 127.0.0.1 - - [23/Jun/2026 02:40:05] "GET /api/signals HTTP/1.1" 200 -
+2026-06-23 02:40:05 | WATCHDOG | INFO  | 127.0.0.1 - - [23/Jun/2026 02:40:05] "GET /api/data HTTP/1.1" 200 -
+2026-06-23 02:40:05 | WATCHDOG | INFO  | 127.0.0.1 - - [23/Jun/2026 02:40:05] "GET /api/account HTTP/1.1" 200 -
+2026-06-23 02:40:51 | WATCHDOG | INFO  | 127.0.0.1 - - [23/Jun/2026 02:40:51] "GET /api/signals HTTP/1.1" 200 -
+2026-06-23 02:40:51 | WATCHDOG | INFO  | 127.0.0.1 - - [23/Jun/2026 02:40:51] "GET /api/data HTTP/1.1" 200 -
+2026-06-23 02:40:51 | WATCHDOG | INFO  | 127.0.0.1 - - [23/Jun/2026 02:40:51] "GET /api/account HTTP/1.1" 200 -
+2026-06-23 02:40:54 | WATCHDOG | INFO  | 127.0.0.1 - - [23/Jun/2026 02:40:54] "GET /api/signals HTTP/1.1" 200 -
+2026-06-23 02:40:54 | WATCHDOG | INFO  | 127.0.0.1 - - [23/Jun/2026 02:40:54] "GET /api/data HTTP/1.1" 200 -
+2026-06-23 02:40:54 | WATCHDOG | INFO  | 127.0.0.1 - - [23/Jun/2026 02:40:54] "GET /api/account HTTP/1.1" 200 -
+2026-06-23 02:40:59 | WATCHDOG | INFO  | 127.0.0.1 - - [23/Jun/2026 02:40:59] "GET /api/signals HTTP/1.1" 200 -
+2026-06-23 02:40:59 | WATCHDOG | INFO  | 127.0.0.1 - - [23/Jun/2026 02:40:59] "GET /api/data HTTP/1.1" 200 -
+2026-06-23 02:40:59 | WATCHDOG | INFO  | 127.0.0.1 - - [23/Jun/2026 02:40:59] "GET /api/account HTTP/1.1" 200 -
+2026-06-23 02:41:04 | WATCHDOG | INFO  | 127.0.0.1 - - [23/Jun/2026 02:41:04] "GET /api/signals HTTP/1.1" 200 -
+2026-06-23 02:41:04 | WATCHDOG | INFO  | 127.0.0.1 - - [23/Jun/2026 02:41:04] "GET /api/data HTTP/1.1" 200 -
+2026-06-23 02:41:04 | WATCHDOG | INFO  | 127.0.0.1 - - [23/Jun/2026 02:41:04] "GET /api/account HTTP/1.1" 200 -
+2026-06-23 02:41:09 | WATCHDOG | INFO  | 127.0.0.1 - - [23/Jun/2026 02:41:09] "GET /api/signals HTTP/1.1" 200 -
+2026-06-23 02:41:09 | WATCHDOG | INFO  | 127.0.0.1 - - [23/Jun/2026 02:41:09] "GET /api/account HTTP/1.1" 200 -
+2026-06-23 02:41:09 | WATCHDOG | INFO  | 127.0.0.1 - - [23/Jun/2026 02:41:09] "GET /api/data HTTP/1.1" 200 -
+2026-06-23 02:41:14 | WATCHDOG | INFO  | 127.0.0.1 - - [23/Jun/2026 02:41:14] "GET /api/signals HTTP/1.1" 200 -
+2026-06-23 02:41:14 | WATCHDOG | INFO  | 127.0.0.1 - - [23/Jun/2026 02:41:14] "GET /api/data HTTP/1.1" 200 -
+2026-06-23 02:41:14 | WATCHDOG | INFO  | 127.0.0.1 - - [23/Jun/2026 02:41:14] "GET /api/account HTTP/1.1" 200 -
+2026-06-23 02:41:19 | WATCHDOG | INFO  | 127.0.0.1 - - [23/Jun/2026 02:41:19] "GET /api/signals HTTP/1.1" 200 -
+2026-06-23 02:41:19 | WATCHDOG | INFO  | 127.0.0.1 - - [23/Jun/2026 02:41:19] "GET /api/data HTTP/1.1" 200 -
+2026-06-23 02:41:19 | WATCHDOG | INFO  | 127.0.0.1 - - [23/Jun/2026 02:41:19] "GET /api/account HTTP/1.1" 200 -
+2026-06-23 02:41:24 | WATCHDOG | INFO  | 127.0.0.1 - - [23/Jun/2026 02:41:24] "GET /api/signals HTTP/1.1" 200 -
+2026-06-23 02:41:24 | WATCHDOG | INFO  | 127.0.0.1 - - [23/Jun/2026 02:41:24] "GET /api/data HTTP/1.1" 200 -
+2026-06-23 02:41:24 | WATCHDOG | INFO  | 127.0.0.1 - - [23/Jun/2026 02:41:24] "GET /api/account HTTP/1.1" 200 -
+2026-06-23 02:41:29 | WATCHDOG | INFO  | 127.0.0.1 - - [23/Jun/2026 02:41:29] "GET /api/signals HTTP/1.1" 200 -
+2026-06-23 02:41:29 | WATCHDOG | INFO  | 127.0.0.1 - - [23/Jun/2026 02:41:29] "GET /api/data HTTP/1.1" 200 -
+2026-06-23 02:41:29 | WATCHDOG | INFO  | 127.0.0.1 - - [23/Jun/2026 02:41:29] "GET /api/account HTTP/1.1" 200 -
+2026-06-23 02:41:34 | WATCHDOG | INFO  | 127.0.0.1 - - [23/Jun/2026 02:41:34] "GET /api/signals HTTP/1.1" 200 -
+2026-06-23 02:41:34 | WATCHDOG | INFO  | 127.0.0.1 - - [23/Jun/2026 02:41:34] "GET /api/data HTTP/1.1" 200 -
+2026-06-23 02:41:34 | WATCHDOG | INFO  | 127.0.0.1 - - [23/Jun/2026 02:41:34] "GET /api/account HTTP/1.1" 200 -
+2026-06-23 02:41:39 | WATCHDOG | INFO  | 127.0.0.1 - - [23/Jun/2026 02:41:39] "GET /api/signals HTTP/1.1" 200 -
+2026-06-23 02:41:39 | WATCHDOG | INFO  | 127.0.0.1 - - [23/Jun/2026 02:41:39] "GET /api/data HTTP/1.1" 200 -
+2026-06-23 02:41:39 | WATCHDOG | INFO  | 127.0.0.1 - - [23/Jun/2026 02:41:39] "GET /api/account HTTP/1.1" 200 -
+2026-06-23 02:41:44 | WATCHDOG | INFO  | 127.0.0.1 - - [23/Jun/2026 02:41:44] "GET /api/signals HTTP/1.1" 200 -
+2026-06-23 02:41:44 | WATCHDOG | INFO  | 127.0.0.1 - - [23/Jun/2026 02:41:44] "GET /api/data HTTP/1.1" 200 -
+2026-06-23 02:41:44 | WATCHDOG | INFO  | 127.0.0.1 - - [23/Jun/2026 02:41:44] "GET /api/account HTTP/1.1" 200 -
+2026-06-23 02:41:49 | WATCHDOG | INFO  | 127.0.0.1 - - [23/Jun/2026 02:41:49] "GET /api/signals HTTP/1.1" 200 -
+2026-06-23 02:41:49 | WATCHDOG | INFO  | 127.0.0.1 - - [23/Jun/2026 02:41:49] "GET /api/data HTTP/1.1" 200 -
+2026-06-23 02:41:49 | WATCHDOG | INFO  | 127.0.0.1 - - [23/Jun/2026 02:41:49] "GET /api/account HTTP/1.1" 200 -
+2026-06-23 02:41:54 | WATCHDOG | INFO  | 127.0.0.1 - - [23/Jun/2026 02:41:54] "GET /api/signals HTTP/1.1" 200 -
+2026-06-23 02:41:54 | WATCHDOG | INFO  | 127.0.0.1 - - [23/Jun/2026 02:41:54] "GET /api/data HTTP/1.1" 200 -
+2026-06-23 02:41:54 | WATCHDOG | INFO  | 127.0.0.1 - - [23/Jun/2026 02:41:54] "GET /api/account HTTP/1.1" 200 -
+2026-06-23 02:41:59 | WATCHDOG | INFO  | 127.0.0.1 - - [23/Jun/2026 02:41:59] "GET /api/signals HTTP/1.1" 200 -
+2026-06-23 02:41:59 | WATCHDOG | INFO  | 127.0.0.1 - - [23/Jun/2026 02:41:59] "GET /api/data HTTP/1.1" 200 -
+2026-06-23 02:41:59 | WATCHDOG | INFO  | 127.0.0.1 - - [23/Jun/2026 02:41:59] "GET /api/account HTTP/1.1" 200 -
+2026-06-23 02:42:04 | WATCHDOG | INFO  | 127.0.0.1 - - [23/Jun/2026 02:42:04] "GET /api/signals HTTP/1.1" 200 -
+2026-06-23 02:42:04 | WATCHDOG | INFO  | 127.0.0.1 - - [23/Jun/2026 02:42:04] "GET /api/data HTTP/1.1" 200 -
+2026-06-23 02:42:04 | WATCHDOG | INFO  | 127.0.0.1 - - [23/Jun/2026 02:42:04] "GET /api/account HTTP/1.1" 200 -
+2026-06-23 02:42:09 | WATCHDOG | INFO  | 127.0.0.1 - - [23/Jun/2026 02:42:09] "GET /api/signals HTTP/1.1" 200 -
+2026-06-23 02:42:09 | WATCHDOG | INFO  | 127.0.0.1 - - [23/Jun/2026 02:42:09] "GET /api/data HTTP/1.1" 200 -
+2026-06-23 02:42:09 | WATCHDOG | INFO  | 127.0.0.1 - - [23/Jun/2026 02:42:09] "GET /api/account HTTP/1.1" 200 -
+2026-06-23 02:42:14 | WATCHDOG | INFO  | 127.0.0.1 - - [23/Jun/2026 02:42:14] "GET /api/signals HTTP/1.1" 200 -
+2026-06-23 02:42:14 | WATCHDOG | INFO  | 127.0.0.1 - - [23/Jun/2026 02:42:14] "GET /api/data HTTP/1.1" 200 -
+2026-06-23 02:42:14 | WATCHDOG | INFO  | 127.0.0.1 - - [23/Jun/2026 02:42:14] "GET /api/account HTTP/1.1" 200 -
+2026-06-23 02:42:19 | WATCHDOG | INFO  | 127.0.0.1 - - [23/Jun/2026 02:42:19] "GET /api/signals HTTP/1.1" 200 -
+2026-06-23 02:42:19 | WATCHDOG | INFO  | 127.0.0.1 - - [23/Jun/2026 02:42:19] "GET /api/data HTTP/1.1" 200 -
+2026-06-23 02:42:19 | WATCHDOG | INFO  | 127.0.0.1 - - [23/Jun/2026 02:42:19] "GET /api/account HTTP/1.1" 200 -
+2026-06-23 02:42:24 | WATCHDOG | INFO  | 127.0.0.1 - - [23/Jun/2026 02:42:24] "GET /api/signals HTTP/1.1" 200 -
+2026-06-23 02:42:24 | WATCHDOG | INFO  | 127.0.0.1 - - [23/Jun/2026 02:42:24] "GET /api/data HTTP/1.1" 200 -
+2026-06-23 02:42:24 | WATCHDOG | INFO  | 127.0.0.1 - - [23/Jun/2026 02:42:24] "GET /api/account HTTP/1.1" 200 -
+2026-06-23 02:42:29 | WATCHDOG | INFO  | 127.0.0.1 - - [23/Jun/2026 02:42:29] "GET /api/signals HTTP/1.1" 200 -
+2026-06-23 02:42:29 | WATCHDOG | INFO  | 127.0.0.1 - - [23/Jun/2026 02:42:29] "GET /api/data HTTP/1.1" 200 -
+2026-06-23 02:42:29 | WATCHDOG | INFO  | 127.0.0.1 - - [23/Jun/2026 02:42:29] "GET /api/account HTTP/1.1" 200 -
+2026-06-23 02:42:34 | WATCHDOG | INFO  | 127.0.0.1 - - [23/Jun/2026 02:42:34] "GET /api/signals HTTP/1.1" 200 -
+2026-06-23 02:42:34 | WATCHDOG | INFO  | 127.0.0.1 - - [23/Jun/2026 02:42:34] "GET /api/data HTTP/1.1" 200 -
+2026-06-23 02:42:34 | WATCHDOG | INFO  | 127.0.0.1 - - [23/Jun/2026 02:42:34] "GET /api/account HTTP/1.1" 200 -
+2026-06-23 02:42:39 | WATCHDOG | INFO  | 127.0.0.1 - - [23/Jun/2026 02:42:39] "GET /api/signals HTTP/1.1" 200 -
+2026-06-23 02:42:39 | WATCHDOG | INFO  | 127.0.0.1 - - [23/Jun/2026 02:42:39] "GET /api/data HTTP/1.1" 200 -
+2026-06-23 02:42:39 | WATCHDOG | INFO  | 127.0.0.1 - - [23/Jun/2026 02:42:39] "GET /api/account HTTP/1.1" 200 -
+2026-06-23 02:42:44 | WATCHDOG | INFO  | 127.0.0.1 - - [23/Jun/2026 02:42:44] "GET /api/signals HTTP/1.1" 200 -
+2026-06-23 02:42:44 | WATCHDOG | INFO  | 127.0.0.1 - - [23/Jun/2026 02:42:44] "GET /api/data HTTP/1.1" 200 -
+2026-06-23 02:42:44 | WATCHDOG | INFO  | 127.0.0.1 - - [23/Jun/2026 02:42:44] "GET /api/account HTTP/1.1" 200 -
+2026-06-23 02:42:49 | WATCHDOG | INFO  | 127.0.0.1 - - [23/Jun/2026 02:42:49] "GET /api/signals HTTP/1.1" 200 -
+2026-06-23 02:42:49 | WATCHDOG | INFO  | 127.0.0.1 - - [23/Jun/2026 02:42:49] "GET /api/data HTTP/1.1" 200 -
+2026-06-23 02:42:49 | WATCHDOG | INFO  | 127.0.0.1 - - [23/Jun/2026 02:42:49] "GET /api/account HTTP/1.1" 200 -
+2026-06-23 02:42:54 | WATCHDOG | INFO  | 127.0.0.1 - - [23/Jun/2026 02:42:54] "GET /api/signals HTTP/1.1" 200 -
+2026-06-23 02:42:54 | WATCHDOG | INFO  | 127.0.0.1 - - [23/Jun/2026 02:42:54] "GET /api/data HTTP/1.1" 200 -
+2026-06-23 02:42:54 | WATCHDOG | INFO  | 127.0.0.1 - - [23/Jun/2026 02:42:54] "GET /api/account HTTP/1.1" 200 -
+2026-06-23 02:42:59 | WATCHDOG | INFO  | 127.0.0.1 - - [23/Jun/2026 02:42:59] "GET /api/signals HTTP/1.1" 200 -
+2026-06-23 02:42:59 | WATCHDOG | INFO  | 127.0.0.1 - - [23/Jun/2026 02:42:59] "GET /api/data HTTP/1.1" 200 -
+2026-06-23 02:42:59 | WATCHDOG | INFO  | 127.0.0.1 - - [23/Jun/2026 02:42:59] "GET /api/account HTTP/1.1" 200 -
+2026-06-23 02:43:04 | WATCHDOG | INFO  | 127.0.0.1 - - [23/Jun/2026 02:43:04] "GET /api/signals HTTP/1.1" 200 -
+2026-06-23 02:43:04 | WATCHDOG | INFO  | 127.0.0.1 - - [23/Jun/2026 02:43:04] "GET /api/data HTTP/1.1" 200 -
+2026-06-23 02:43:04 | WATCHDOG | INFO  | 127.0.0.1 - - [23/Jun/2026 02:43:04] "GET /api/account HTTP/1.1" 200 -
+2026-06-23 02:43:09 | WATCHDOG | INFO  | 127.0.0.1 - - [23/Jun/2026 02:43:09] "GET /api/signals HTTP/1.1" 200 -
+2026-06-23 02:43:09 | WATCHDOG | INFO  | 127.0.0.1 - - [23/Jun/2026 02:43:09] "GET /api/data HTTP/1.1" 200 -
+2026-06-23 02:43:09 | WATCHDOG | INFO  | 127.0.0.1 - - [23/Jun/2026 02:43:09] "GET /api/account HTTP/1.1" 200 -
+2026-06-23 02:43:14 | WATCHDOG | INFO  | 127.0.0.1 - - [23/Jun/2026 02:43:14] "GET /api/signals HTTP/1.1" 200 -
+2026-06-23 02:43:14 | WATCHDOG | INFO  | 127.0.0.1 - - [23/Jun/2026 02:43:14] "GET /api/data HTTP/1.1" 200 -
+2026-06-23 02:43:14 | WATCHDOG | INFO  | 127.0.0.1 - - [23/Jun/2026 02:43:14] "GET /api/account HTTP/1.1" 200 -
+2026-06-23 02:43:19 | WATCHDOG | INFO  | 127.0.0.1 - - [23/Jun/2026 02:43:19] "GET /api/signals HTTP/1.1" 200 -
+2026-06-23 02:43:19 | WATCHDOG | INFO  | 127.0.0.1 - - [23/Jun/2026 02:43:19] "GET /api/data HTTP/1.1" 200 -
+2026-06-23 02:43:19 | WATCHDOG | INFO  | 127.0.0.1 - - [23/Jun/2026 02:43:19] "GET /api/account HTTP/1.1" 200 -
+2026-06-23 02:43:24 | WATCHDOG | INFO  | 127.0.0.1 - - [23/Jun/2026 02:43:24] "GET /api/signals HTTP/1.1" 200 -
+2026-06-23 02:43:24 | WATCHDOG | INFO  | 127.0.0.1 - - [23/Jun/2026 02:43:24] "GET /api/data HTTP/1.1" 200 -
+2026-06-23 02:43:24 | WATCHDOG | INFO  | 127.0.0.1 - - [23/Jun/2026 02:43:24] "GET /api/account HTTP/1.1" 200 -
+2026-06-23 02:43:29 | WATCHDOG | INFO  | 127.0.0.1 - - [23/Jun/2026 02:43:29] "GET /api/signals HTTP/1.1" 200 -
+2026-06-23 02:43:29 | WATCHDOG | INFO  | 127.0.0.1 - - [23/Jun/2026 02:43:29] "GET /api/data HTTP/1.1" 200 -
+2026-06-23 02:43:29 | WATCHDOG | INFO  | 127.0.0.1 - - [23/Jun/2026 02:43:29] "GET /api/account HTTP/1.1" 200 -
+2026-06-23 02:43:34 | WATCHDOG | INFO  | 127.0.0.1 - - [23/Jun/2026 02:43:34] "GET /api/signals HTTP/1.1" 200 -
+2026-06-23 02:43:34 | WATCHDOG | INFO  | 127.0.0.1 - - [23/Jun/2026 02:43:34] "GET /api/data HTTP/1.1" 200 -
+2026-06-23 02:43:34 | WATCHDOG | INFO  | 127.0.0.1 - - [23/Jun/2026 02:43:34] "GET /api/account HTTP/1.1" 200 -
+2026-06-23 02:43:39 | WATCHDOG | INFO  | 127.0.0.1 - - [23/Jun/2026 02:43:39] "GET /api/signals HTTP/1.1" 200 -
+2026-06-23 02:43:39 | WATCHDOG | INFO  | 127.0.0.1 - - [23/Jun/2026 02:43:39] "GET /api/account HTTP/1.1" 200 -
+2026-06-23 02:43:39 | WATCHDOG | INFO  | 127.0.0.1 - - [23/Jun/2026 02:43:39] "GET /api/data HTTP/1.1" 200 -
+2026-06-23 02:43:44 | WATCHDOG | INFO  | 127.0.0.1 - - [23/Jun/2026 02:43:44] "GET /api/signals HTTP/1.1" 200 -
+2026-06-23 02:43:44 | WATCHDOG | INFO  | 127.0.0.1 - - [23/Jun/2026 02:43:44] "GET /api/data HTTP/1.1" 200 -
+2026-06-23 02:43:44 | WATCHDOG | INFO  | 127.0.0.1 - - [23/Jun/2026 02:43:44] "GET /api/account HTTP/1.1" 200 -
+2026-06-23 02:43:49 | WATCHDOG | INFO  | 127.0.0.1 - - [23/Jun/2026 02:43:49] "GET /api/signals HTTP/1.1" 200 -
+2026-06-23 02:43:49 | WATCHDOG | INFO  | 127.0.0.1 - - [23/Jun/2026 02:43:49] "GET /api/data HTTP/1.1" 200 -
+2026-06-23 02:43:49 | WATCHDOG | INFO  | 127.0.0.1 - - [23/Jun/2026 02:43:49] "GET /api/account HTTP/1.1" 200 -
+2026-06-23 02:43:54 | WATCHDOG | INFO  | 127.0.0.1 - - [23/Jun/2026 02:43:54] "GET /api/signals HTTP/1.1" 200 -
+2026-06-23 02:43:54 | WATCHDOG | INFO  | 127.0.0.1 - - [23/Jun/2026 02:43:54] "GET /api/data HTTP/1.1" 200 -
+2026-06-23 02:43:54 | WATCHDOG | INFO  | 127.0.0.1 - - [23/Jun/2026 02:43:54] "GET /api/account HTTP/1.1" 200 -
+2026-06-23 02:43:59 | WATCHDOG | INFO  | 127.0.0.1 - - [23/Jun/2026 02:43:59] "GET /api/signals HTTP/1.1" 200 -
+2026-06-23 02:43:59 | WATCHDOG | INFO  | 127.0.0.1 - - [23/Jun/2026 02:43:59] "GET /api/data HTTP/1.1" 200 -
+2026-06-23 02:43:59 | WATCHDOG | INFO  | 127.0.0.1 - - [23/Jun/2026 02:43:59] "GET /api/account HTTP/1.1" 200 -
+2026-06-23 02:44:04 | WATCHDOG | INFO  | 127.0.0.1 - - [23/Jun/2026 02:44:04] "GET /api/signals HTTP/1.1" 200 -
+2026-06-23 02:44:04 | WATCHDOG | INFO  | 127.0.0.1 - - [23/Jun/2026 02:44:04] "GET /api/data HTTP/1.1" 200 -
+2026-06-23 02:44:04 | WATCHDOG | INFO  | 127.0.0.1 - - [23/Jun/2026 02:44:04] "GET /api/account HTTP/1.1" 200 -
+2026-06-23 02:44:09 | WATCHDOG | INFO  | 127.0.0.1 - - [23/Jun/2026 02:44:09] "GET /api/signals HTTP/1.1" 200 -
+2026-06-23 02:44:09 | WATCHDOG | INFO  | 127.0.0.1 - - [23/Jun/2026 02:44:09] "GET /api/data HTTP/1.1" 200 -
+2026-06-23 02:44:09 | WATCHDOG | INFO  | 127.0.0.1 - - [23/Jun/2026 02:44:09] "GET /api/account HTTP/1.1" 200 -
+2026-06-23 02:44:14 | WATCHDOG | INFO  | 127.0.0.1 - - [23/Jun/2026 02:44:14] "GET /api/signals HTTP/1.1" 200 -
+2026-06-23 02:44:14 | WATCHDOG | INFO  | 127.0.0.1 - - [23/Jun/2026 02:44:14] "GET /api/data HTTP/1.1" 200 -
+2026-06-23 02:44:14 | WATCHDOG | INFO  | 127.0.0.1 - - [23/Jun/2026 02:44:14] "GET /api/account HTTP/1.1" 200 -
+2026-06-23 02:44:19 | WATCHDOG | INFO  | 127.0.0.1 - - [23/Jun/2026 02:44:19] "GET /api/signals HTTP/1.1" 200 -
+2026-06-23 02:44:19 | WATCHDOG | INFO  | 127.0.0.1 - - [23/Jun/2026 02:44:19] "GET /api/data HTTP/1.1" 200 -
+2026-06-23 02:44:19 | WATCHDOG | INFO  | 127.0.0.1 - - [23/Jun/2026 02:44:19] "GET /api/account HTTP/1.1" 200 -
+2026-06-23 02:44:24 | WATCHDOG | INFO  | 127.0.0.1 - - [23/Jun/2026 02:44:24] "GET /api/signals HTTP/1.1" 200 -
+2026-06-23 02:44:24 | WATCHDOG | INFO  | 127.0.0.1 - - [23/Jun/2026 02:44:24] "GET /api/data HTTP/1.1" 200 -
+2026-06-23 02:44:24 | WATCHDOG | INFO  | 127.0.0.1 - - [23/Jun/2026 02:44:24] "GET /api/account HTTP/1.1" 200 -
+2026-06-23 02:44:29 | WATCHDOG | INFO  | 127.0.0.1 - - [23/Jun/2026 02:44:29] "GET /api/signals HTTP/1.1" 200 -
+2026-06-23 02:44:29 | WATCHDOG | INFO  | 127.0.0.1 - - [23/Jun/2026 02:44:29] "GET /api/data HTTP/1.1" 200 -
+2026-06-23 02:44:29 | WATCHDOG | INFO  | 127.0.0.1 - - [23/Jun/2026 02:44:29] "GET /api/account HTTP/1.1" 200 -
+2026-06-23 02:44:34 | WATCHDOG | INFO  | 127.0.0.1 - - [23/Jun/2026 02:44:34] "GET /api/signals HTTP/1.1" 200 -
+2026-06-23 02:44:34 | WATCHDOG | INFO  | 127.0.0.1 - - [23/Jun/2026 02:44:34] "GET /api/data HTTP/1.1" 200 -
+2026-06-23 02:44:34 | WATCHDOG | INFO  | 127.0.0.1 - - [23/Jun/2026 02:44:34] "GET /api/account HTTP/1.1" 200 -
+2026-06-23 02:44:40 | WATCHDOG | INFO  | 127.0.0.1 - - [23/Jun/2026 02:44:40] "GET /api/signals HTTP/1.1" 200 -
+2026-06-23 02:44:40 | WATCHDOG | INFO  | 127.0.0.1 - - [23/Jun/2026 02:44:40] "GET /api/data HTTP/1.1" 200 -
+2026-06-23 02:44:40 | WATCHDOG | INFO  | 127.0.0.1 - - [23/Jun/2026 02:44:40] "GET /api/account HTTP/1.1" 200 -
+2026-06-23 02:44:45 | WATCHDOG | INFO  | 127.0.0.1 - - [23/Jun/2026 02:44:45] "GET /api/signals HTTP/1.1" 200 -
+2026-06-23 02:44:45 | WATCHDOG | INFO  | 127.0.0.1 - - [23/Jun/2026 02:44:45] "GET /api/data HTTP/1.1" 200 -
+2026-06-23 02:44:45 | WATCHDOG | INFO  | 127.0.0.1 - - [23/Jun/2026 02:44:45] "GET /api/account HTTP/1.1" 200 -
+2026-06-23 02:44:50 | WATCHDOG | INFO  | 127.0.0.1 - - [23/Jun/2026 02:44:50] "GET /api/signals HTTP/1.1" 200 -
+2026-06-23 02:44:50 | WATCHDOG | INFO  | 127.0.0.1 - - [23/Jun/2026 02:44:50] "GET /api/data HTTP/1.1" 200 -
+2026-06-23 02:44:50 | WATCHDOG | INFO  | 127.0.0.1 - - [23/Jun/2026 02:44:50] "GET /api/account HTTP/1.1" 200 -
+2026-06-23 02:44:55 | WATCHDOG | INFO  | 127.0.0.1 - - [23/Jun/2026 02:44:55] "GET /api/signals HTTP/1.1" 200 -
+2026-06-23 02:44:55 | WATCHDOG | INFO  | 127.0.0.1 - - [23/Jun/2026 02:44:55] "GET /api/data HTTP/1.1" 200 -
+2026-06-23 02:44:55 | WATCHDOG | INFO  | 127.0.0.1 - - [23/Jun/2026 02:44:55] "GET /api/account HTTP/1.1" 200 -
+2026-06-23 02:45:00 | WATCHDOG | INFO  | 127.0.0.1 - - [23/Jun/2026 02:45:00] "GET /api/signals HTTP/1.1" 200 -
+2026-06-23 02:45:00 | WATCHDOG | INFO  | 127.0.0.1 - - [23/Jun/2026 02:45:00] "GET /api/data HTTP/1.1" 200 -
+2026-06-23 02:45:00 | WATCHDOG | INFO  | 127.0.0.1 - - [23/Jun/2026 02:45:00] "GET /api/account HTTP/1.1" 200 -
+2026-06-23 02:45:05 | WATCHDOG | INFO  | 127.0.0.1 - - [23/Jun/2026 02:45:05] "GET /api/signals HTTP/1.1" 200 -
+2026-06-23 02:45:05 | WATCHDOG | INFO  | 127.0.0.1 - - [23/Jun/2026 02:45:05] "GET /api/data HTTP/1.1" 200 -
+2026-06-23 02:45:05 | WATCHDOG | INFO  | 127.0.0.1 - - [23/Jun/2026 02:45:05] "GET /api/account HTTP/1.1" 200 -
+2026-06-23 02:45:07 | WATCHDOG | INFO  | 127.0.0.1 - - [23/Jun/2026 02:45:07] "GET /socket.io/?EIO=4&transport=websocket&sid=f0_TxzZAFtJsdNKOAAAC HTTP/1.1" 200 -

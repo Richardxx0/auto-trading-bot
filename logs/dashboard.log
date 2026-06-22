@@ -1,0 +1,13 @@
+2026-06-23 01:50:11 | WATCHDOG | INFO  | Failed to load SSL library: <class 'OSError'> (no library called "ssl" found)
+2026-06-23 01:50:11 | WATCHDOG | INFO  | cryptg detected, it will be used for encryption
+2026-06-23 01:50:11 | WATCHDOG | INFO  | ´Ó C:\Users\Richard\Documents\New project\auto-trading-bot\.env ¼ÓÔØ»·¾³±äÁ¿
+2026-06-23 01:50:11 | WATCHDOG | WARNING | Binance ºÏÔ¼Ä£ÄâÄ£Ê½ÒÑÆôÓÃ ¡ª¡ª ¶©µ¥ÎªÄ£ÄâÖ´ÐÐ
+ * Tip: There are .env files present. Install python-dotenv to use them.
+[ÒÇ±íÅÌ] ½»Ò×¼ÇÂ¼ÎÄ¼þ: C:\Users\Richard\Documents\New project\auto-trading-bot\trades.json
+[ÒÇ±íÅÌ] ¾ÍÐ÷£¬µÈ´ýÊÖ¶¯Ë¢ÐÂ ...
+[ÒÇ±íÅÌ] Æô¶¯ Web ·þÎñ: http://127.0.0.1:5000
+ * Serving Flask app 'app'
+ * Debug mode: off
+2026-06-23 01:50:11 | WATCHDOG | INFO  | [31m[1mWARNING: This is a development server. Do not use it in a production deployment. Use a production WSGI server instead.[0m
+ * Running on http://127.0.0.1:5000
+2026-06-23 01:50:11 | WATCHDOG | INFO  | [33mPress CTRL+C to quit[0m

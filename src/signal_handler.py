@@ -496,6 +496,9 @@ class SignalHandler:
             if vol_r < self._cfg.volume_min_ratio * vol_mult:
                 logger.info("【成交量过滤】%s vol=%.2f < 最低要求%.2f（力度%d個），跳过\nanalysis keys: %s",
                             contract_symbol, vol_r, self._cfg.volume_min_ratio * vol_mult, vol_mult, list(analysis.keys()))
+                return
+
+        if analysis.get("error"):
             logger.warning(
                 "【第8步B】技术分析失败（%s），降级为市价开仓",
                 analysis["error"],
@@ -698,6 +701,7 @@ class SignalHandler:
         else:
             # 无分析数据时，退回到固定 TP
             tp_levels = [{"price": risk_result["tp"], "qty_pct": 1.0, "label": "TP"}]
+            tp_price = risk_result["tp"]
             logger.info("  使用固定SL/TP: SL=%.8f TP=%.8f",
                         sl_price, risk_result["tp"])
 
@@ -711,7 +715,7 @@ class SignalHandler:
             "止损=%.8f (-%.1f%%)  止盈=%.8f (+%.1f%%)",
             raw_qty, risk_multiplier, qty,
             sl_price, self._cfg.stop_loss_pct * 100,
-            tp_price, self._cfg.take_profit_pct * 100,
+            risk_result["tp"], self._cfg.take_profit_pct * 100,
         )
 
         logger.info("  执行市价开多 %s ...", symbol)
