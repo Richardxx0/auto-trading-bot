@@ -111,7 +111,8 @@ class TechnicalAnalyzer:
             "atr_ratio": round(m_4h.get("atr_ratio", 1.0), 2),
             "ema_spread_pct": round(m_4h.get("ema_spread_pct", 0), 4),
             "atr_pct": round(m_4h["atr_pct"], 6),
-            "price_vs_ema20_pct": round(m_4h["price_vs_ema20_pct"], 4)
+            "price_vs_ema20_pct": round(m_4h["price_vs_ema20_pct"], 4),
+            "vol_ratio": round(m_4h.get("vol_ratio", 0), 4)
         })
 
         # 3. 联合条件概率共振（点 1 升级：多周期一致性交叉确立）
@@ -270,8 +271,8 @@ class TechnicalAnalyzer:
         window = valid_ema20[-5:]
         ema_slope = ((window[-1] - window[0]) / max(abs(window[0]), 1e-10) * 100) / (len(window) - 1)
 
-        vol_ma20 = sum(volume[-20:]) / 20 if len(volume) >= 20 else 0
-        vol_ratio_v = volume[-1] / vol_ma20 if vol_ma20 > 0 else 0
+        vol_ma20 = sum(volume[-21:-1]) / 20 if len(volume) >= 21 else 0
+        vol_ratio_v = volume[-2] / vol_ma20 if vol_ma20 > 0 else 0
 
         # 得分模型求解
         trend_score = (adx_v / max(adx_th, 1e-10)) * 2.5 + (ema_spread / spread_th) + (abs(ema_slope) / 0.05)
