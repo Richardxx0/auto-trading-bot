@@ -3,3 +3,16 @@
 *~
 .env
 codex_telegram_session*
+
+# Temp debug files
+_fix_*.py
+_watchdog.py
+test_*.py
+_check_*.py
+trace_*.py
+inspect_*.py
+network_*.py
+dedup.json
+events.json
+signals.json
+venv/

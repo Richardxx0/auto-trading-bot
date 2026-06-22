@@ -265,7 +265,7 @@ class SignalHandler:
         if self._cfg.volume_confirm_enabled and not analysis.get("error"):
             vol_r = analysis.get("vol_ratio", 0)
             if vol_r < self._cfg.volume_min_ratio * vol_mult:
-                logger.info("【成交量过滤】%s vol=%.2f < 最低要求%.2f，跳过",
+                logger.info("【成交量过滤】%s vol=%.2f < 最低要求%.2f（力度%d倍），跳过",
                             contract_symbol, vol_r, self._cfg.volume_min_ratio * vol_mult, vol_mult)
                 self._标记去重(contract_symbol)
                 return
@@ -375,6 +375,21 @@ class SignalHandler:
         signal_type = signal["signal_type"]
         msg_price = signal.get("price")
         alert_count = signal.get("alert_count", 0)
+
+        # 逐级加严：根据预警次数动态调整核实力度
+        if alert_count >= 10:
+            scr_level = 3
+        elif alert_count >= 6:
+            scr_level = 2
+        elif alert_count >= 2:
+            scr_level = 1
+        else:
+            scr_level = 0
+        min_confirm = getattr(self._cfg,"regime_min_confirm_bars",2) + scr_level
+        vol_mult = 1.0 + 0.5 * scr_level
+        if scr_level > 0:
+            logger.info("【逐级加严】预警次数=%d, 力度等级=%d, 需confirm>=%d, 成交量乘数=%.1f",
+                        alert_count, scr_level, min_confirm, vol_mult)
 
         logger.info("=" * 56)
         logger.info("【第1步跳过】收到信号: 币种=%s 类型=%s 第%d次报警 来源=%s",
@@ -496,9 +511,8 @@ class SignalHandler:
         if self._cfg.volume_confirm_enabled and not analysis.get("error"):
             vol_r = analysis.get("vol_ratio", 0)
             if vol_r < self._cfg.volume_min_ratio * vol_mult:
-                logger.info("【成交量过滤】%s vol=%.2f < 最低要求%.2f，跳过",
+                logger.info("【成交量过滤】%s vol=%.2f < 最低要求%.2f（力度%d個），跳过",
                             contract_symbol, vol_r, self._cfg.volume_min_ratio * vol_mult, vol_mult)
-                self._标记去重(contract_symbol)
                 return
 
         if analysis.get("error"):
@@ -596,7 +610,7 @@ class SignalHandler:
         symbol: str,
         raw_regime: str,
         raw_strength: str,
-        min_confirm: int = 2,
+        min_confirm: int = 1,
     ) -> dict | None:
         """市场状态稳定确认。
 
@@ -623,8 +637,9 @@ class SignalHandler:
                 "[REGIME UPDATE] %s %s confirm=1/%d（首次）",
                 symbol, raw_regime, min_confirm,
             )
+            if min_confirm <= 1:
+                return self._market_state_cache[symbol]
             return None
-
         last_regime = cached["regime"]
 
         # 场景B：与上次状态一致 → 增加确认计数
