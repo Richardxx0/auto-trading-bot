@@ -92,23 +92,27 @@
         html.dark .common-table th { background: #0d111c; }
         html.light .common-table th { background: #f8fafc; }
         .common-table td { padding: 0.625rem 0.5rem; }
+        @keyframes blink-anim {
+            0%, 100% { opacity: 1; }
+            50% { opacity: 0.2; }
+        }
+        .blink {
+            animation: blink-anim 0.8s ease-in-out infinite;
+        }
     </style>
 </head>
 <body class="min-h-screen p-6 pb-16">
     
-    <!-- 头部栏：回归极致纯净 -->
     <header class="flex justify-between items-center mb-6 px-2">
         <div class="flex items-center space-x-3">
             <div id="status-lamp" class="h-3 w-3 rounded-full indicator-green"></div>
             <h1 class="text-xl font-bold tracking-wider">Richard 监控面板</h1>
         </div>
         <div>
-            <!-- 主题切换按钮移动到了原长连接的位置 -->
             <button onclick="toggleTheme()" class="glass-panel px-4 py-1.5 text-xs font-semibold cursor-pointer hover:scale-105 transition">🌓 <span id="theme-text">切换至浅色模式</span></button>
         </div>
     </header>
 
-    <!-- 顶部数据快照 -->
     <div class="grid grid-cols-2 md:grid-cols-5 gap-4 mb-6">
         <div class="glass-panel p-4"><p class="text-xs text-slate-400 mb-1">账户权益</p><p id="stat-equity" class="text-lg font-extrabold">124,500.00</p></div>
         <div class="glass-panel p-4"><p class="text-xs text-slate-400 mb-1">可用余额</p><p id="stat-balance" class="text-lg font-extrabold text-emerald-400">98,420.50</p></div>
@@ -117,11 +121,8 @@
         <div class="glass-panel p-4"><p class="text-xs text-slate-400 mb-1">当前浮动盈亏</p><p id="stat-unrealized" class="text-lg font-extrabold text-emerald-400">+1,450.00</p></div>
     </div>
 
-    <!-- 主网格划分 -->
     <div class="grid grid-cols-1 lg:grid-cols-12 gap-6 items-start">
-        <!-- 左侧区域 -->
         <div class="lg:col-span-7 space-y-6">
-            <!-- 真实持仓列表 -->
             <div class="glass-panel p-4">
                 <div class="flex justify-between items-center mb-3 pb-2 border-b table-divide">
                     <h2 class="text-sm font-bold tracking-wider">📊 真实持仓列表</h2>
@@ -135,19 +136,15 @@
                             </tr>
                         </thead>
                         <tbody id="position-table-body" class="divide-y table-divide">
-                            <tr class="row-hover"><td>BTCUSDT <span class="text-[10px] bg-emerald-500/20 text-emerald-400 px-1 rounded">多</span></td><td class="font-mono">64250.0</td><td class="text-right font-mono text-amber-500">0.4500</td><td class="text-right font-mono">64800.0</td><td class="text-right font-mono text-emerald-400">+0.85%</td><td class="text-center"><button class="text-red-400 text-[11px] font-bold">平仓</button></td></tr>
-                            <tr class="row-hover"><td>ETHUSDT <span class="text-[10px] bg-rose-500/20 text-rose-400 px-1 rounded">空</span></td><td class="font-mono">3450.0</td><td class="text-right font-mono text-amber-500">-2.5000</td><td class="text-right font-mono">3410.0</td><td class="text-right font-mono text-emerald-400">+1.16%</td><td class="text-center"><button class="text-red-400 text-[11px] font-bold">平仓</button></td></tr>
-                            <tr class="row-hover"><td>SLXUSDT <span class="text-[10px] bg-emerald-500/20 text-emerald-400 px-1 rounded">多</span></td><td class="font-mono">0.2077</td><td class="text-right font-mono text-amber-500">12000.0</td><td class="text-right font-mono">0.2110</td><td class="text-right font-mono text-emerald-400">+1.58%</td><td class="text-center"><button class="text-red-400 text-[11px] font-bold">平仓</button></td></tr>
-                        </tbody>
+                            </tbody>
                     </table>
                 </div>
             </div>
 
-            <!-- 开仓记录 -->
             <div class="glass-panel p-4">
                 <div class="flex justify-between items-center mb-3 pb-2 border-b table-divide">
                     <h2 class="text-sm font-bold tracking-wider">📋 开仓记录</h2>
-                    <span id="signal-count" class="text-xs font-mono text-slate-400">3条记录</span>
+                    <span id="signal-count" class="text-xs font-mono text-slate-400">0条记录</span>
                 </div>
                 <div class="table-scroll-container">
                     <table class="common-table text-left">
@@ -157,24 +154,20 @@
                             </tr>
                         </thead>
                         <tbody id="signal-table-body" class="divide-y table-divide font-medium">
-                            <tr class="row-hover"><td class="font-mono text-slate-400">17:05:12</td><td class="text-center font-bold">SLXUSDT</td><td class="text-center text-emerald-400">多</td><td class="text-center font-mono">0.2077</td><td class="text-center font-mono">88</td><td class="text-center text-emerald-400">已开仓</td><td class="text-right font-mono text-slate-400">17次</td></tr>
-                        </tbody>
+                            </tbody>
                     </table>
                 </div>
             </div>
 
-            <!-- 异步流式日志监控 -->
             <div class="glass-panel p-4 flex flex-col h-[200px]">
                 <h2 class="text-sm font-bold tracking-wider mb-2">📑 异步流式日志监控</h2>
                 <div id="log-container" class="flex-1 overflow-y-auto font-mono text-[11px] space-y-1 text-slate-400">
-                    <p class="text-slate-500">[17:30:00] 系统核心双轨对齐布局装载完毕...</p>
+                    <p class="text-slate-500">[系统时间] 正在等待核心量化流式数据...</p>
                 </div>
             </div>
         </div>
 
-        <!-- 右侧区域 -->
         <div class="lg:col-span-5 space-y-6">
-            <!-- 核心信号深度追踪 -->
             <div class="glass-panel p-4">
                 <h2 class="text-sm font-bold tracking-wider mb-3 pb-2 border-b table-divide">🎯 核心信号深度追踪</h2>
                 <div class="table-scroll-container">
@@ -185,13 +178,11 @@
                             </tr>
                         </thead>
                         <tbody id="detail-tracker-body" class="divide-y table-divide font-mono">
-                            <tr class="row-hover"><td class="font-sans font-bold text-indigo-400">SLXUSDT</td><td class="text-slate-300">0.20774</td><td class="text-emerald-400 font-medium">0.21105</td><td class="text-right"><span class="text-amber-400 bg-amber-500/10 px-1.5 py-0.5 border border-amber-500/20 rounded text-[10px]">次数: 17次</span></td></tr>
-                        </tbody>
+                            </tbody>
                     </table>
                 </div>
             </div>
 
-            <!-- 盈亏分析图形看板 -->
             <div class="glass-panel p-4">
                 <h2 class="text-sm font-bold tracking-wider mb-3 pb-2 border-b table-divide flex justify-between items-center">
                     <span>📊 盈亏分析</span>
@@ -212,26 +203,18 @@
         </div>
     </div>
 
-    <!-- 🛠️ 重构后的极简中文固底状态栏 -->
     <footer class="fixed bottom-0 left-0 right-0 h-7 bg-slate-950/80 dark:bg-black/80 backdrop-blur border-t border-slate-800/60 flex items-center justify-between px-6 text-[10px] font-mono tracking-wider text-slate-400 z-50 select-none">
         <div class="flex items-center space-x-5">
-            <!-- 1. 长连接状态移至第一顺位 -->
             <div id="conn-status" class="text-emerald-400 font-bold">🟢 长连接运行中</div>
-            
-            <!-- 2. 全中文本地引擎状态 -->
             <div class="flex items-center space-x-1 border-l border-slate-800/80 pl-4">
                 <span class="text-slate-500">本地引擎:</span>
                 <span class="text-emerald-400 font-semibold">已启动</span>
             </div>
-            
-            <!-- 3. 全中文币安延迟数据 -->
             <div class="flex items-center space-x-1 border-l border-slate-800/80 pl-4">
                 <span class="text-slate-500">币安延迟:</span>
-                <span id="delay-binance" class="text-emerald-400 font-bold transition-all duration-300">5 ms</span>
+                <span id="delay-binance" class="text-emerald-400 font-bold transition-all duration-300">等待中</span>
             </div>
         </div>
-        
-        <!-- 4. 去除框线的纯净系统时间戳，靠右对齐 -->
         <div class="flex items-center space-x-4">
             <span id="header-timestamp" class="text-slate-300 font-semibold text-[11px]">00:00:00</span>
             <span class="text-slate-600">|</span>
@@ -239,16 +222,18 @@
         </div>
     </footer>
 
-        <script>
+    <script>
 var allTrades = [], allSignals = [], allLogs = [];
 var refreshTimer = null, socket = null;
 function $(id) { return document.getElementById(id); }
+
 function num(v, d) {
     if (v === null || v === void 0 || v === '' || isNaN(Number(v))) return '\u2014';
     v = Number(v);
     if (d === void 0) d = Math.abs(v) >= 100 ? 2 : Math.abs(v) >= 1 ? 4 : 6;
     return v.toFixed(d);
 }
+
 function loadDashboard() {
     fetch('/api/data').then(function(r){return r.json();}).then(function(data) {
         if (!data || !data.trades) return;
@@ -256,8 +241,12 @@ function loadDashboard() {
         updateSummary(data.summary);
         updateAccount(data.account);
         renderPositionsTable();
-        updateCharts();
+        // 核心修复：只有在外部真实资产未注入时，才降级使用本地计算持仓，防止抢占覆盖
+        if(!window.hasExternalStructureData) {
+            updateCharts();
+        }
     }).catch(function(){});
+    
     fetch('/api/signals').then(function(r){return r.json();}).then(function(d) {
         if (!d || !d.signals) return;
         allSignals = d.signals;
@@ -266,6 +255,7 @@ function loadDashboard() {
         $('signal-count').textContent = d.count + '\u6761\u8bb0\u5f55';
     }).catch(function(){});
 }
+
 function updateSummary(s) {
     if (!s) return;
     $('stat-count').textContent = s.open_count || 0;
@@ -275,11 +265,13 @@ function updateSummary(s) {
     el.textContent = (v > 0 ? '+' : '') + Number(v).toFixed(2);
     el.className = 'text-lg font-extrabold ' + (v > 0 ? 'text-emerald-400' : v < 0 ? 'text-rose-500' : '');
 }
+
 function updateAccount(a) {
     if (!a) return;
     $('stat-equity').textContent = Number(a.total_balance || 0).toFixed(2);
     $('stat-balance').textContent = Number(a.available_balance || 0).toFixed(2);
 }
+
 function renderPositionsTable() {
     var tb = $('position-table-body');
     var open = allTrades.filter(function(t){return t.status === 'OPEN';});
@@ -308,6 +300,7 @@ function renderPositionsTable() {
     }
     tb.innerHTML = html;
 }
+
 function renderSignalsTable() {
     var tb = $('signal-table-body');
     if (!allSignals.length) {
@@ -327,6 +320,8 @@ function renderSignalsTable() {
         else if (statusText === '\u8df3\u8fc7') statusColor = '#f59e0b';
         else if (statusText === '\u5931\u8d25') statusColor = '#f43f5e';
         var score = Number(s.score || 0);
+        
+        // 核心修改 1：移除开仓记录表格中提醒次数多余的“次数”前缀
         html += '<tr class="row-hover">' +
             '<td class="font-mono text-slate-400">' + (s.time || '\u2014') + '</td>' +
             '<td class="text-center font-bold">' + (s.symbol || '') + '</td>' +
@@ -339,6 +334,7 @@ function renderSignalsTable() {
     }
     tb.innerHTML = html;
 }
+
 function renderDetailTracker() {
     var tb = $('detail-tracker-body');
     if (!tb) return;
@@ -362,15 +358,18 @@ function renderDetailTracker() {
     for (var i = 0; i < keys.length; i++) {
         var sym = keys[i], e = map[sym];
         var mp = mk[sym] || e.firstPrice || '\u2014';
+        
+        // 核心修改 2：彻底消灭核心信号表格里的“次数:”和英文冒号前缀，只保留数字和次
         html += '<tr class="row-hover">' +
             '<td class="font-sans font-bold text-indigo-400">' + sym + '</td>' +
             '<td class="text-slate-300">' + num(e.firstPrice) + '</td>' +
             '<td style="color:#10b981;font-weight:500">' + num(mp) + '</td>' +
-            '<td class="text-right"><span style="color:#f59e0b;background:rgba(245,158,11,0.1);padding:0 6px;border:1px solid rgba(245,158,11,0.2);border-radius:4px;font-size:10px">\u6b21\u6570: ' + e.count + '\u6b21</span></td>' +
+            '<td class="text-right"><span style="color:#f59e0b;background:rgba(245,158,11,0.1);padding:0 6px;border:1px solid rgba(245,158,11,0.2);border-radius:4px;font-size:10px">' + e.count + '\u6b21</span></td>' +
         '</tr>';
     }
     tb.innerHTML = html;
 }
+
 function initSocketIO() {
     socket = io();
     socket.on('connect', function() {
@@ -384,12 +383,19 @@ function initSocketIO() {
         $('conn-status').innerHTML = '\u25cf \u957f\u8fde\u63a5\u5df2\u65ad\u5f00';
     });
     socket.on('log', function(entry) { addLogEntry(entry); });
+    socket.on('heartbeat', function(data) {
+        if (data && typeof window.updateBinanceDelay === 'function') {
+            window.updateBinanceDelay(data.binance_delay, data.is_mock);
+        }
+    });
 }
+
 function addLogEntry(entry) {
     allLogs.push(entry);
     if (allLogs.length > 500) allLogs.shift();
     renderLogs();
 }
+
 function renderLogs() {
     var c = $('log-container');
     var html = '';
@@ -400,6 +406,7 @@ function renderLogs() {
     c.innerHTML = html;
     c.scrollTop = c.scrollHeight;
 }
+
 function closePosition(symbol) {
     if (!confirm('\u786e\u8ba4\u5e73\u4ed3 ' + symbol + ' \u5417\uff1f')) return;
     fetch('/api/close_position', {
@@ -411,6 +418,7 @@ function closePosition(symbol) {
         else { alert('\u5e73\u4ed3\u5931\u8d25: ' + (d.error || '\u672a\u77e5\u9519\u8bef')); }
     }).catch(function(e){ alert('\u8bf7\u6c42\u5931\u8d25: ' + e.message); });
 }
+
 function triggerPanicClose() {
     if (!confirm('\u26a0\ufe0f \u786e\u8ba4\u4e00\u952e\u6e05\u7a7a\u6240\u6709\u4ed3\u4f4d\u5417\uff1f\u6b64\u64cd\u4f5c\u4e0d\u53ef\u64a4\u9500\uff01')) return;
     fetch('/api/close_all_positions', {method: 'POST'})
@@ -419,37 +427,107 @@ function triggerPanicClose() {
             else { alert('\u6e05\u4ed3\u5931\u8d25: ' + (d.error || '\u672a\u77e5\u9519\u8bef')); }
         }).catch(function(e){ alert('\u8bf7\u6c42\u5931\u8d25: ' + e.message); });
 }
+
 var trendChart = null, structChart = null;
+window.hasExternalStructureData = false; // 状态锁，用于隔离本地轮询与外源真数据驱动
+
 function initCharts() {
     trendChart = echarts.init($('trend-chart'), 'dark');
+    // 核心修改 3：移除近一个月资产变化的伪造 X/Y 轴数据，全空初始化，仅展示空白等待 Python 推送
     trendChart.setOption({
         backgroundColor: 'transparent',
         tooltip: {trigger: 'axis'},
-        grid: {top: '15%', bottom: '15%', left: '12%', right: '5%'},
-        xAxis: {type: 'category', data: ['1\u6708','2\u6708','3\u6708','4\u6708','5\u6708','6\u6708'], axisLine: {lineStyle: {color: 'rgba(255,255,255,0.1)'}}},
+        grid: {top: '15%', bottom: '15%', left: '15%', right: '5%'},
+        xAxis: {type: 'category', data: [], axisLine: {lineStyle: {color: 'rgba(255,255,255,0.1)'}}},
         yAxis: {type: 'value', name: 'USD', splitLine: {lineStyle: {color: 'rgba(255,255,255,0.05)'}}},
-        series: [{name: '\u8d44\u4ea7\u51c0\u503c\u53d8\u5316', type: 'bar', data: [1200,-800,2400,3100,-500,1800], itemStyle: {color: function(p){return p.value>=0?'#3b82f6':'#f43f5e';}}}]
+        series: [{name: '\u8d44\u4ea7\u51c0\u503c\u53d8\u5316', type: 'bar', data: [], itemStyle: {color: function(p){return p.value>=0?'#3b82f6':'#f43f5e';}}}]
     });
+    
     structChart = echarts.init($('structure-chart'), 'dark');
+    // 核心修改 4：将 center 深度向左偏移（设为 ['18%', '50%']），全面防止气泡悬浮框覆盖右侧币种
     structChart.setOption({
         backgroundColor: 'transparent',
-        tooltip: {trigger: 'item'},
-        legend: {orient: 'vertical', right: '5%', top: 'center', textStyle: {color: '#94a3b8', fontSize: 11}},
-        series: [{name: '\u6301\u4ed3\u5e01\u79cd\u6743\u91cd', type: 'pie', radius: ['50%','80%'], center: ['35%','50%'], label: {show: true, position: 'center', formatter: '\u6682\u65e0\u6570\u636e', fontSize: 12, fontWeight: 'bold', color: '#94a3b8'}, data: []}]
+        tooltip: {trigger: 'item', confine: true},
+        legend: {orient: 'vertical', right: '2%', top: 'center', textStyle: {color: '#94a3b8', fontSize: 10}},
+        series: [{
+            name: '\u6301\u4ed3\u5e01\u79cd\u6743\u91cd', 
+            type: 'pie', 
+            radius: ['52%','80%'], 
+            center: ['18%','50%'], 
+            avoidLabelOverlap: false,
+            label: {show: true, position: 'center', formatter: '\u6682\u65e0\u6570\u636e', fontSize: 11, fontWeight: 'bold', color: '#94a3b8'}, 
+            data: []
+        }]
     });
     window.addEventListener('resize', function(){if(trendChart)trendChart.resize();if(structChart)structChart.resize();});
 }
-function updateCharts() {
+
+// 核心修改 5：完善外部流式更新资产变化的全局接收器（无数据时直接调用清空展示空白）
+function updateTrendData(xAxisLabels, valueData) {
+    if (!trendChart) return;
+    var m = xAxisLabels || [];
+    var d = valueData || [];
+    trendChart.setOption({ xAxis: { data: m }, series: [{ data: d }] });
+}
+
+// 核心修改 6：开放供后端写入完全真实的资产及财务结构图表接口，并关闭本地自动轮询的覆盖动作
+function updateStructureData(totalEquityStr, coinDataArray) {
     if (!structChart) return;
+    window.hasExternalStructureData = true; // 锁定状态，拒绝被旧有的 updateCharts 降级覆盖
+    var arr = coinDataArray || [];
+    var equity = totalEquityStr || '0.00';
+    structChart.setOption({
+        series: [{ data: arr, label: { formatter: equity + '\nUSD' } }]
+    });
+}
+
+// 核心修改 7：修复延迟逻辑，统一底层更新函数，不再预留死数据，纯外源驱动
+var lastDelayRecvTime = 0;
+
+function updateExchangeDelay(exchange, ms) {
+    var el = document.getElementById('delay-' + exchange);
+    if (!el) return;
+    el.innerText = ms + ' ms';
+    if (ms < 50) { el.className = 'text-emerald-400 font-bold'; el.classList.remove('blink'); }
+    else if (ms < 150) { el.className = 'text-amber-400 font-bold'; el.classList.remove('blink'); }
+    else { el.className = 'text-rose-500 font-bold animate-pulse'; el.classList.add('blink'); }
+}
+
+function updateBinanceDelay(ms, isMock) {
+    var el = document.getElementById('delay-binance');
+    if (!el) return;
+    lastDelayRecvTime = Date.now();
+    var tag = isMock ? '[\u6a21\u62df] ' : '';
+    el.innerText = tag + ms + ' ms';
+    if (ms < 50) {
+        el.style.color = '#10b981';
+        el.classList.remove('blink');
+    } else if (ms <= 150) {
+        el.style.color = '#f59e0b';
+        el.classList.remove('blink');
+    } else {
+        el.style.color = '#f43f5e';
+        el.classList.add('blink');
+    }
+}
+
+// 本地默认兜底计算持仓占比（如果没有真实的外源全资产账户数据灌入，才显示此部分）
+function updateCharts() {
+    if (!structChart || window.hasExternalStructureData) return;
     var open = allTrades.filter(function(t){return t.status === 'OPEN';});
-    if (open.length === 0) return;
+    if (open.length === 0) {
+        structChart.setOption({ series: [{ data: [], label: { formatter: '\u6682\u65e0\u6301\u4ed3' } }] });
+        return;
+    }
     var pieData = [], totalVal = 0;
     var colors = ['#3b82f6','#6366f1','#0ea5e9','#10b981','#f59e0b','#f43f5e','#8b5cf6'];
     for (var i = 0; i < open.length; i++) {
         var p = open[i];
         var qty = Math.abs(Number(p.position_size || p.qty || 0));
         var mp = Number(p.mark_price || p.entry_price || 0);
-        var val = qty * mp;
+        // 核心修改：如果后端传了真实保证金直接用 margin，否则头寸除以杠杆（默认10）
+        var leverage = Number(p.leverage || 10);
+        var val = p.margin ? Number(p.margin) : (qty * mp) / leverage;
         totalVal += val;
         pieData.push({name: p.symbol, value: Math.round(val*100)/100});
     }
@@ -460,11 +538,13 @@ function updateCharts() {
         }), label: {formatter: totalVal.toFixed(2)+'\nUSD'}}]
     });
 }
+
 function startAutoRefresh() {
     loadDashboard();
     if (refreshTimer) clearInterval(refreshTimer);
     refreshTimer = setInterval(loadDashboard, 5000);
 }
+
 function startLiveClock() {
     var el = $('header-timestamp');
     function tick() {
@@ -474,6 +554,7 @@ function startLiveClock() {
     tick();
     setInterval(tick, 1000);
 }
+
 function toggleTheme() {
     var h = document.documentElement;
     if (h.classList.contains('dark')) {
@@ -485,11 +566,23 @@ function toggleTheme() {
     }
     setTimeout(function(){window.dispatchEvent(new Event('resize'));}, 100);
 }
+
 window.addEventListener('DOMContentLoaded', function() {
     initCharts();
     startLiveClock();
     initSocketIO();
     startAutoRefresh();
+    
+    // \u5fc3\u8df3\u62a4\u822a\uff1a\u8d85\u8fc73\u79d2\u672a\u6536\u5230\u5ef6\u8fdf\u66f4\u65b0\u5219\u663e\u793a\u5df2\u65ad\u5f00
+    setInterval(function() {
+        var el = document.getElementById('delay-binance');
+        if (!el) return;
+        if (lastDelayRecvTime > 0 && Date.now() - lastDelayRecvTime > 3000) {
+            el.innerText = '\u5df2\u65ad\u5f00';
+            el.style.color = '#f43f5e';
+            el.classList.add('blink');
+        }
+    }, 1000);
 });
     </script>
 

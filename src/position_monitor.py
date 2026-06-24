@@ -19,7 +19,7 @@ class PositionMonitor:
         self._running = False
         self._sl_stage: dict[str, int] = {}
         self._checking = False
-        self._last_pos_data: dict[str, dict] = {}
+        self._last_pos_data: dict = {}
 
     async def start(self):
         self._running = True
@@ -107,19 +107,53 @@ class PositionMonitor:
             s = pos.get("symbol", "")
             q = float(pos.get("positionAmt", 0) or 0)
             if abs(q) > 0.001:
-                self._last_pos_data[s] = {
+                side = pos.get("positionSide")
+                if not side:
+                    side = "LONG" if q > 0 else "SHORT"
+                self._last_pos_data[(s, side.upper())] = {
                     "close_price": float(pos.get("markPrice", 0) or 0),
                     "unrealized_pnl": float(pos.get("unrealizedProfit", 0) or 0),
                 }
 
-        # cleanup closed positions
-        pos_syms = {p["symbol"] for p in positions if abs(float(p.get("positionAmt",0) or 0)) > 0.001}
+        # ================== 双重防线清理逻辑 ==================
+        # 1. 提取币安实时的持仓镜像，同时记录实时入场价
+        active_positions_info = {}
+        for p in positions:
+            amt = float(p.get("positionAmt", 0) or 0)
+            if abs(amt) > 0.001:
+                side = p.get("positionSide")
+                if not side:
+                    side = "LONG" if amt > 0 else "SHORT"
+                s = p["symbol"]
+                active_positions_info[(s, side.upper())] = float(p.get("entryPrice", 0) or 0)
+
+        # 2. 遍历本地 OPEN 记录，执行方向 + 入场价双重校验
         for t in trades:
             s = t.get("symbol", "")
-            if s not in pos_syms:
-                ldata = self._last_pos_data.get(s, {})
+            t_side = (t.get("direction") or t.get("side") or "LONG").upper()
+            t_entry = float(t.get("entry_price", 0) or 0)
+
+            key = (s, t_side)
+            should_cleanup = False
+            reason = ""
+
+            if key not in active_positions_info:
+                should_cleanup = True
+                reason = "交易所已无持仓"
+            else:
+                binance_entry = active_positions_info[key]
+                if t_entry > 0 and binance_entry > 0:
+                    deviation = abs(binance_entry - t_entry) / t_entry
+                    if deviation > 0.005:
+                        should_cleanup = True
+                        reason = "同向换批次(本地:" + str(t_entry) + " vs 交易所:" + str(binance_entry) + ")"
+
+            if should_cleanup:
+                ldata = self._last_pos_data.get(key, {})
                 ts.close_trade(t["id"], realized_pnl=ldata.get("unrealized_pnl", 0.0), close_price=ldata.get("close_price", 0.0))
-                logger.info("Cleaned closed trade: " + s)
+                if s in self._sl_stage:
+                    del self._sl_stage[s]
+                logger.info("[CLEANUP] 成功清理脱节记录: " + s + " " + t_side + " | 原因: " + reason)
 
     async def _update_sl(self, symbol, qty, new_sl, pnl_pct):
         try:

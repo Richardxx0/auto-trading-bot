@@ -409,8 +409,13 @@ class ExchangeClient:
                     params={"stopPrice": sl_rounded, "positionSide": "LONG"},
                 )
                 results["stop_loss"] = sl_order
-                logger.info(">>> 止损挂单成功: 价格=%s 订单号=%s",
-                            sl_rounded, sl_order.get("id", "N/A"))
+                print(f"[DEBUG_CONTROL] {symbol} STOP_MARKET 止损单返回: type={type(sl_order)} value={sl_order}")
+                if not sl_order or 'id' not in sl_order:
+                    print(f"[CRITICAL_WARNING] !!! 测试网静默拒绝了 {symbol} 的 STOP_MARKET 订单 !!!")
+                    results["stop_loss"] = None
+                else:
+                    logger.info(">>> 止损挂单成功: 价格=%s 订单号=%s",
+                                sl_rounded, sl_order.get("id", "N/A"))
             except Exception as exc:
                 logger.error("止损挂单失败 %s: %s", symbol, exc)
 
@@ -445,6 +450,17 @@ class ExchangeClient:
                 except Exception as exc:
                     logger.error("%s 止盈挂单失败 %s (price=%s): %s",
                                 tp_label, symbol, tp_price, exc)
+
+        # === 第三步：双端硬核确认 ===
+        try:
+            open_orders = self._exch.fetch_open_orders(symbol)
+            has_sl = any(o.get("type") in ("STOP_MARKET", "STOP") for o in open_orders)
+            if not has_sl:
+                print(f"[FATAL] 双端同步失败！{symbol} 止损单未在交易所生效，执行应急平仓...")
+                results["stop_loss"] = None
+                self.close_position_full(symbol)
+        except Exception as e:
+            print(f"[FATAL_ERROR] 双端审查异常: {e}")
 
     def _构建交易所(self):
         exch = ccxt.binanceusdm({

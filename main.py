@@ -46,6 +46,23 @@ def 解析参数() -> argparse.Namespace:
     return parser.parse_args()
 
 
+async def _cron_cleanup_task(signal_handler) -> None:
+    """cron cleanup at 13/28/43/58"""
+    logger = logging.getLogger("cron_cleanup")
+    logger.info("cron cleanup started")
+    import time
+    while True:
+        try:
+            current_min = time.localtime().tm_min
+            if current_min in [13, 28, 43, 58]:
+                signal_handler._pre_signal_cleanup()
+                await asyncio.sleep(61)
+                continue
+        except Exception as e:
+            logger.exception("cron error: %s", e)
+        await asyncio.sleep(10)
+
+
 async def 主异步函数() -> None:
     """主流程。"""
     args = 解析参数()
@@ -114,8 +131,9 @@ async def 主异步函数() -> None:
         # 并发运行监听器和关闭等待
         监听任务 = asyncio.create_task(listener.start())
         监控任务 = asyncio.create_task(monitor.start())
+        清洗任务 = asyncio.create_task(_cron_cleanup_task(handler))
         await asyncio.wait(
-            [监听任务, 监控任务, asyncio.create_task(关闭事件.wait())],
+            [监听任务, 监控任务, 清洗任务, asyncio.create_task(关闭事件.wait())],
             return_when=asyncio.FIRST_COMPLETED,
         )
     except Exception as exc:

@@ -21,6 +21,8 @@ from src.exchange import ExchangeClient
 from dashboard import trade_store as ts
 from dashboard.yss_scraper import YssScraper
 from dashboard import event_log as el
+import urllib.request
+import urllib.error
 
 app = Flask(__name__)
 app.config["SECRET_KEY"] = "trade-dashboard-secret"
@@ -266,6 +268,42 @@ def on_ping():
 # ── 启动 ──────────────────────────────────────
 
 
+def binance_speed_test(is_testnet=True):
+    url = "https://testnet.binancefuture.com/fapi/v1/time" if is_testnet else "https://fapi.binance.com/fapi/v1/time"
+    try:
+        start_time = time.time()
+        req = urllib.request.Request(url, headers={'User-Agent': 'Mozilla/5.0'})
+        with urllib.request.urlopen(req, timeout=2) as response:
+            if response.getcode() == 200:
+                return int((time.time() - start_time) * 1000)
+    except urllib.error.URLError as e:
+        print(f"[测速警告] 币安连接失败 (Testnet={is_testnet}): {e}")
+    except Exception as e:
+        print(f"[测速错误]: {e}")
+    return None
+
+def bgcolor_heartbeat_thread():
+    add_log("INFO", "心跳线程已启动")
+    global _cfg
+    print("[心跳线程] 等待交易引擎配置初始化...")
+    while _cfg is None:
+        time.sleep(0.5)
+    add_log("INFO", "延迟测速开始")
+    print("[心跳] ready")
+    while True:
+        try:
+            is_mock = getattr(_cfg, 'BINANCE_TESTNET', True)
+            delay = binance_speed_test(is_testnet=is_mock)
+            # Binance delay logged via heartbeat event
+            if delay is not None:
+                socketio.emit('heartbeat', {'binance_delay': delay, 'is_mock': is_mock})
+            else:
+                socketio.emit('heartbeat', {'binance_delay': 999, 'is_mock': is_mock})
+        except Exception as err:
+            print(f"[心跳线程异常]: {err}")
+        time.sleep(3)  # 15分钟
+
+
 def _event_poller():
     import time as _t
     last = 0
@@ -295,8 +333,8 @@ def main():
         # 启动 YSS 信号轮询
     #_scraper = YssScraper()
     #_scraper.start()
-    import threading
-    threading.Thread(target=_event_poller, daemon=True).start()
+    socketio.start_background_task(bgcolor_heartbeat_thread)
+    socketio.start_background_task(_event_poller)
 
     print("[仪表盘] 启动 Web 服务: http://127.0.0.1:5000")
     socketio.run(app, host="127.0.0.1", port=5000, debug=False, allow_unsafe_werkzeug=True)

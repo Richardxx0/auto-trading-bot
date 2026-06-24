@@ -269,6 +269,15 @@ class ExchangeService:
 
     # ── 精度工具 ────────────────────────────────────────────
 
+    async def cancel_all_take_profits(self, symbol: str) -> bool:
+        try:
+            return await self.run(
+                self._exch.cancel_all_take_profits, symbol,
+                timeout=self.TIMEOUTS["cancel"],
+            )
+        except Exception:
+            return False
+
     async def amount_to_precision(self, symbol: str, amount: float) -> float:
         """获取币种的数量精度。"""
         try:

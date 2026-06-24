@@ -635,6 +635,9 @@ class SignalHandler:
 
         # ════════════════════════════════════════════
 
+                # ??????????????????
+        self._pre_signal_cleanup()
+
         if entry_zone in ("good", "ok"):
 
             logger.info("【第9步】入场评级=%s → 市价开多", entry_zone)
@@ -1341,6 +1344,37 @@ class SignalHandler:
         return None
 
 
+
+    def _pre_signal_cleanup(self):
+        try:
+            from dashboard import trade_store as ts
+            from datetime import datetime
+            pos_res = self._exchange._exch.fapiPrivateV2GetPositionRisk()
+            real_active = set()
+            for p in pos_res:
+                amt = float(p.get("positionAmt", 0) or 0)
+                if abs(amt) > 0.001:
+                    side = p.get("positionSide")
+                    if not side or side == "BOTH":
+                        side = "LONG" if amt > 0 else "SHORT"
+                    real_active.add((p["symbol"], side.upper()))
+            local_trades = ts.load_all()
+            now_ts = time.time()
+            for t in local_trades:
+                if t.get("status") != "OPEN":
+                    continue
+                t_sym = t.get("symbol")
+                t_side = t.get("direction", "LONG").upper()
+                try:
+                    open_dt = datetime.strptime(t.get("open_time"), "%Y-%m-%d %H:%M:%S")
+                    open_ts = open_dt.timestamp()
+                except:
+                    open_ts = 0
+                if (t_sym, t_side) not in real_active and (now_ts - open_ts > 60):
+                    print(f"🚨 [信号前置斩杀] 发现幽灵残留: {t_sym} {t_side}")
+                    ts.close_trade(t["id"], realized_pnl=0.0, close_price=0.0)
+        except Exception as e:
+            print(f"❌ 前置清洗异常: {e}")
 
     # ── 执行方法 ─────────────────────────────────────────────
 
