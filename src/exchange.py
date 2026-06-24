@@ -1,4 +1,4 @@
-﻿"""
+"""
 Binance 合约交易所客户端（基于 ccxt）。
 
 功能：查询余额、合约检查、持仓查询、K线数据、市价/限价开多、止盈止损。
@@ -81,6 +81,36 @@ class ExchangeClient:
             logger.error("获取余额失败: %s", exc)
             return 0.0
 
+    def _cap_qty(self, symbol: str, raw_qty: float) -> float:
+        try:
+            m = self._exch.markets_by_id.get(symbol)
+            if isinstance(m, list) and m:
+                m = m[0]
+            if not m:
+                m = self._exch.markets_by_id.get(symbol)
+                if isinstance(m, list) and m:
+                    m = m[0]
+            if not m:
+                return raw_qty
+            info = m.get('info', {})
+            filters = info.get('filters', [])
+            max_qty = 999999999.0
+            min_qty = 0.0
+            for f in filters:
+                ft = f.get('filterType', '')
+                if ft in ('MARKET_LOT_SIZE', 'LOT_SIZE'):
+                    max_qty = float(f.get('maxQty', max_qty))
+                    min_qty = float(f.get('minQty', min_qty))
+                    if ft == 'MARKET_LOT_SIZE':
+                        break
+            capped = max(min(raw_qty, max_qty), min_qty)
+            if capped < raw_qty:
+                logger.warning('  %s number %.4f > max allowable %.4f, clipped', symbol, raw_qty, max_qty)
+            return capped
+        except Exception as exc:
+            logger.warning('  check %s number cap failed: %s', symbol, exc)
+            return raw_qty
+
     def set_leverage(self, symbol: str, leverage: int) -> None:
         """设置合约杠杆倍数。"""
         try:
@@ -114,7 +144,7 @@ class ExchangeClient:
         try:
             positions = self._exch.fapiPrivateV2GetPositionRisk()
             return sum(1 for p in positions
-                      if abs(float(p.get("positionAmt", 0) or 0)) > 0.001)
+                      if abs(float(p.get("positionAmt", 0) or 0)) > 0.01)
         except Exception:
             return 0
 
@@ -125,7 +155,7 @@ class ExchangeClient:
             order = self._exch.create_order(
                 symbol=symbol, type="STOP_MARKET", side="SELL",
                 amount=qty_r,
-                params={"stopPrice": sl_r, "reduceOnly": True},
+                params={"stopPrice": sl_r, "positionSide": "LONG"},
             )
             return order.get("id")
         except Exception as exc:
@@ -141,6 +171,16 @@ class ExchangeClient:
             return True
         except Exception:
             return False
+    def cancel_all_take_profits(self, symbol: str) -> bool:
+        try:
+            orders = self._exch.fetch_open_orders(symbol)
+            for o in orders:
+                if o.get("type") == "TAKE_PROFIT_MARKET" and o.get("side") == "SELL":
+                    self._exch.cancel_order(id=o["id"], symbol=symbol)
+            return True
+        except Exception:
+            return False
+
 
     def fetch_open_interest(self, symbol: str) -> float | None:
         try:
@@ -164,6 +204,7 @@ class ExchangeClient:
         self.set_leverage(symbol, self._cfg.leverage)
 
         qty = float(self._exch.amount_to_precision(symbol, quantity))
+        qty = self._cap_qty(symbol, qty)
         if qty <= 0:
             err_msg = f"数量 {quantity} 经精度舍入后为 {qty}，无法开仓"
             logger.error(err_msg)
@@ -173,7 +214,7 @@ class ExchangeClient:
         logger.info("正在市价开多 %s 数量=%s", symbol, qty)
 
         try:
-            entry_order = self._exch.create_market_buy_order(symbol, qty)
+            entry_order = self._exch.create_order(symbol=symbol, type='MARKET', side='BUY', amount=qty, params={'positionSide': 'LONG'})
             results["entry"] = entry_order
             logger.info(">>> 市价开仓成交: id=%s 价格=%s 数量=%s",
                         entry_order.get("id", "N/A"),
@@ -210,7 +251,7 @@ class ExchangeClient:
                      symbol, qty, limit_price_rounded)
 
         try:
-            order = self._exch.create_limit_buy_order(symbol, qty, limit_price_rounded)
+            order = self._exch.create_order(symbol=symbol, type='LIMIT', side='BUY', amount=qty, price=limit_price_rounded, params={'positionSide': 'LONG'})
             logger.info(">>> 限价单已挂: id=%s 价格=%s 数量=%s",
                         order.get("id", "N/A"),
                         order.get("price", limit_price_rounded),
@@ -254,11 +295,80 @@ class ExchangeClient:
     ) -> dict[str, Any]:
         """对已有持仓挂止盈止损单（reduced-only）。"""
         results: dict[str, Any] = {"stop_loss": None, "take_profits": []}
-
         qty = float(self._exch.amount_to_precision(symbol, quantity))
 
+        tp_levels = [{"price": take_profit_price, "qty_pct": 1.0, "label": "TP"}]
         self._挂止盈止损(symbol, qty, stop_loss_price, tp_levels, results)
         return results
+
+# ── 全额平仓（清盘） ─────────────────────────────────────────────────
+
+    def close_position_full(self, symbol: str) -> dict[str, Any]:
+        """全额平仓——实时获取持仓量，用 reduceOnly 一键清零。"""
+        result: dict[str, Any] = {
+            "success": False,
+            "order": None,
+            "position_amt_before": 0.0,
+            "error": None,
+        }
+
+        try:
+            self._确保市场已加载()
+
+            # 1. 通过 fetch_positions 获取实时持仓
+            positions = self._exch.fetch_positions([symbol])
+            pos_amt = 0.0
+            pos_side = ""
+
+            for pos in positions:
+                amt = float(pos.get("contracts", 0) or pos.get("positionAmt", 0) or 0)
+                if abs(amt) > 0:
+                    pos_amt = abs(amt)
+                    pos_side = pos.get("positionSide", "")
+                    break
+
+            result["position_amt_before"] = pos_amt
+
+            if pos_amt <= 0:
+                logger.info("close_position_full: %s 无持仓，跳过", symbol)
+                result["success"] = True
+                return result
+
+            # 2. 决定买卖方向
+            side = "SELL" if pos_side == "LONG" else "BUY"
+
+            # 3. 精度处理
+            qty = float(self._exch.amount_to_precision(symbol, pos_amt))
+
+            # 4. 市价下单 + reduceOnly 安全锁
+            logger.info(
+                "全额平仓 %s: 方向=%s 数量=%s positionSide=%s",
+                symbol, side, qty, pos_side,
+            )
+
+            order = self._exch.create_order(
+                symbol=symbol,
+                type="MARKET",
+                side=side,
+                amount=qty,
+                params={
+                    "reduceOnly": True,
+                    "positionSide": pos_side,
+                },
+            )
+
+            result["order"] = order
+            result["success"] = True
+            logger.info(
+                "全额平仓成功 %s: order_id=%s filled=%s",
+                symbol, order.get("id", "N/A"), order.get("filled", "N/A"),
+            )
+
+        except Exception as exc:
+            logger.error("全额平仓失败 %s: %s", symbol, exc)
+            result["error"] = str(exc)
+
+        return result
 
     # ── 资金费率 ──────────────────────────────────────────────
 
@@ -296,7 +406,7 @@ class ExchangeClient:
                     type="STOP_MARKET",
                     side="SELL",
                     amount=qty,
-                    params={"stopPrice": sl_rounded, "reduceOnly": True},
+                    params={"stopPrice": sl_rounded, "positionSide": "LONG"},
                 )
                 results["stop_loss"] = sl_order
                 logger.info(">>> 止损挂单成功: 价格=%s 订单号=%s",
@@ -325,7 +435,7 @@ class ExchangeClient:
                         type="TAKE_PROFIT_MARKET",
                         side="SELL",
                         amount=tp_qty,
-                        params={"stopPrice": tp_rounded, "reduceOnly": True},
+                        params={"stopPrice": tp_rounded, "positionSide": "LONG"},
                     )
                     results["take_profits"].append(tp_order)
                     logger.info(">>> %s 止盈挂单成功: 价格=%s 数量=%s(%d%%) 订单号=%s",

@@ -1,4 +1,4 @@
-﻿"""
+"""
 从环境变量或 .env 文件加载配置。
 """
 import os
@@ -43,10 +43,10 @@ class Config:
     # 止盈百分比（0.04 = 入场价的 4%），风险收益比 1:2
     take_profit_pct: float = 0.04
     # 杠杆倍数
-    leverage: int = 5
+    leverage: int = 10
 
     # ── 风控参数 ────
-    max_open_positions: int = 5
+    max_open_positions: int = 9
     trailing_stop_activation_pct: float = 0.03
     trailing_stop_distance_pct: float = 0.02
 
@@ -78,7 +78,7 @@ class Config:
     # ═══════════════════════════════════════════════════
     # ⚠️  测试阶段=1, 生产实盘必须改为2或更高 ⚠️
     # ═══════════════════════════════════════════════════
-    regime_min_confirm_bars: int = 1
+    regime_min_confirm_bars: int = 2
 
     # ── 技术分析参数 ──────────────────────────────
     # K线周期（用于主趋势判断）
@@ -166,7 +166,9 @@ def load_config(env_file: str | None = None) -> Config:
         risk_per_trade=float(os.environ.get("RISK_PER_TRADE", "0.02")),
         stop_loss_pct=float(os.environ.get("STOP_LOSS_PCT", "0.02")),
         take_profit_pct=float(os.environ.get("TAKE_PROFIT_PCT", "0.04")),
-        leverage=int(os.environ.get("LEVERAGE", "5")),
+        leverage=int(os.environ.get("LEVERAGE", "10")),
+        trailing_stop_activation_pct=float(os.environ.get("TRAILING_STOP_ACTIVATION_PCT", "0.012")),
+        trailing_stop_distance_pct=float(os.environ.get("TRAILING_STOP_DISTANCE_PCT", "0.002")),
         log_level=os.environ.get("LOG_LEVEL", "INFO"),
         analysis_timeframe=os.environ.get("ANALYSIS_TIMEFRAME", "4h"),
         regime_min_confirm_bars=int(os.environ.get("REGIME_MIN_CONFIRM_BARS", "1")),

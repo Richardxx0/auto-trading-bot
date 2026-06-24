@@ -16,3 +16,24 @@ dedup.json
 events.json
 signals.json
 venv/
+# Generated runtime data
+trades.json
+
+# Log files (auto-generated)
+logs/*.log
+
+# Temp debug/utils files
+_fix_*.py
+_fx_*.py
+_gen_*.py
+_watchdog.py
+_fix*.py
+_check_*.py
+_close_*.py
+_find_*.py
+
+# Single underscore temp files
+_
+
+# Log directory
+logs/

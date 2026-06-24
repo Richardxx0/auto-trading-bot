@@ -85,8 +85,8 @@ def _fetch_dashboard_data() -> dict | None:
             continue
         live_map[sym] = {
             "mark_price": float(pos.get("markPrice", 0) or 0),
-            "unrealized_pnl": float(pos.get("unrealizedPnl", 0) or 0),
-            "margin": float(pos.get("initialMargin", 0) or 0),
+            "unrealized_pnl": float(pos.get("unrealizedProfit") or pos.get("unrealizedPnl", 0) or 0),
+            "margin": float(pos.get("initialMargin") or pos.get("isolatedMargin", 0) or 0),
             "position_size": size,
             "entry_price": float(pos.get("entryPrice", 0) or 0),
             "liquidation_price": float(pos.get("liquidationPrice", 0) or 0),
@@ -167,6 +167,25 @@ def api_data():
     except Exception as e:
         add_log("ERROR", f"获取余额失败: {e}")
     return jsonify(data)
+
+
+@app.route("/api/debug")
+def api_debug():
+    global _exchange
+    if _exchange is None:
+        if not _init_exchange():
+            return jsonify({"error": "not init"}), 500
+    try:
+        pos = _exchange._exch.fapiPrivateV2GetPositionRisk() if _exchange else []
+        sample = pos[:3] if pos else []
+        return jsonify({
+            "count": len(pos),
+            "symbols": [p.get("symbol","") for p in pos],
+            "sample_keys": list(sample[0].keys()) if sample else [],
+            "sample": sample,
+        })
+    except Exception as e:
+        return jsonify({"error": str(e)}), 500
 
 
 @app.route("/api/account")

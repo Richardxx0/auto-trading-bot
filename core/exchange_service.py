@@ -232,6 +232,19 @@ class ExchangeService:
             logger.error("设置止盈止损失败 %s: %s", symbol, exc)
             return {"error": str(exc)}
 
+    # ── 全频平仓（清盘） ─────────────────────────────────────────────────
+
+    async def close_position_full(self, symbol: str) -> dict:
+        """全额平仓——实时获取持仓量，reduceOnly 一键清零。"""
+        try:
+            return await self.run(
+                self._exch.close_position_full, symbol,
+                timeout=self.TIMEOUTS["order"],
+            )
+        except Exception as exc:
+            logger.error("全额平仓失败 %s: %s", symbol, exc)
+            return {"success": False, "error": str(exc)}
+
     # ── 止损管理 ────────────────────────────────────────────
 
     async def place_stop_loss_order(

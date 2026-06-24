@@ -1,91 +1,139 @@
-﻿"""持仓监控器 —— 后台管理移动止损。"""
+"""
+Position Monitor - price milestone state machine.
+
+Logic:
+  profit>=6%   -> breakeven SL (entry*1.002)
+  profit>=10%  -> SL raised to +4%
+"""
 import asyncio
 import logging
-
 from core.exchange_service import ExchangeService
+from dashboard import trade_store as ts
 logger = logging.getLogger(__name__)
 
-
 class PositionMonitor:
-    """后台任务：监控持仓，管理移动止损。"""
-
-    def __init__(self, exchange_service: ExchangeService, config):
+    def __init__(self, exchange_service, config):
         self._exch_service = exchange_service
         self._exch = exchange_service._exch
         self._cfg = config
         self._running = False
-        self._high_prices: dict[str, float] = {}
+        self._sl_stage: dict[str, int] = {}
+        self._checking = False
+        self._last_pos_data: dict[str, dict] = {}
 
     async def start(self):
         self._running = True
-        logger.info("持仓监控器已启动（检查间隔30秒）")
+        logger.info("PosMon started (10s)")
         while self._running:
             try:
                 await self._check()
             except Exception as exc:
-                logger.exception("持仓监控异常: %s", exc)
-            await asyncio.sleep(30)
+                logger.exception("PosMon error: " + str(exc))
+            await asyncio.sleep(10)
 
     def stop(self):
         self._running = False
 
     async def _check(self):
+        if self._checking:
+            return
+        self._checking = True
         try:
             def _fetch():
                 return self._exch._exch.fapiPrivateV2GetPositionRisk()
             positions = await self._exch_service.run(
-              _fetch, timeout=self._exch_service.TIMEOUTS["position"])
+                _fetch, timeout=self._exch_service.TIMEOUTS["position"])
         except Exception as exc:
-            logger.warning("获取持仓失败: %s", exc)
+            logger.warning("Fetch positions failed: " + str(exc))
             return
+        finally:
+            self._checking = False
+
+        trades = [t for t in ts.load_all() if t.get("status") == "OPEN"]
+        trade_map = {t["symbol"]: t for t in trades}
+
         for pos in positions:
             symbol = pos.get("symbol", "")
-            size = float(pos.get("positionAmt", 0) or 0)
-            entry = float(pos.get("entryPrice", 0) or 0)
+            cur_qty = float(pos.get("positionAmt", 0) or 0)
             mark = float(pos.get("markPrice", 0) or 0)
-            if abs(size) < 0.001:
-                self._high_prices.pop(symbol, None)
+            if abs(cur_qty) < 0.001 or mark <= 0:
                 continue
-            if entry <= 0 or mark <= 0:
+            trade = trade_map.get(symbol)
+            if not trade:
                 continue
-            prev_high = self._high_prices.get(symbol, entry)
-            curr_high = max(prev_high, mark)
-            self._high_prices[symbol] = curr_high
-            pnl_pct = (mark - entry) / entry
-            activation = self._cfg.trailing_stop_activation_pct
-            trail_dist = self._cfg.trailing_stop_distance_pct
-            if pnl_pct < activation or curr_high <= entry:
+            entry = trade.get("entry_price", 0) or float(pos.get("entryPrice", 0) or 0)
+            if entry <= 0:
                 continue
-            # ATR-based trailing stop (if configured)
-            if self._cfg.trailing_stop_atr_multiplier > 0:
+
+            # price milestone state machine
+            current_profit = (mark - entry) / entry
+            stage = self._sl_stage.get(symbol, 0)
+            new_sl = None
+
+            if current_profit >= 0.20 and stage < 4:
+                new_sl = entry * 1.20
+                self._sl_stage[symbol] = 4
+                logger.info("[RUNNER] %s profit+%.1f%% -> final stage, SL locked at +20%%, cancel take-profits",
+                            symbol, current_profit * 100)
                 try:
-                    candles = await self._exch_service.fetch_ohlcv(symbol, "4h", 20)
-                    if candles and len(candles) > 15:
-                        highs = [c[2] for c in candles[-15:]]
-                        lows = [c[3] for c in candles[-15:]]
-                        closes = [c[4] for c in candles[-15:]]
-                        trs = []
-                        for i in range(1, len(candles[-15:])):
-                            tr = max(highs[i] - lows[i],
-                                     abs(highs[i] - closes[i-1]),
-                                     abs(lows[i] - closes[i-1]))
-                            trs.append(tr)
-                        atr_val = sum(trs) / len(trs)
-                        new_sl = curr_high - atr_val * self._cfg.trailing_stop_atr_multiplier
-                        logger.info("  ATR距离=%.4f ATR倍数=%.1f 新SL=%.6f",
-                                    atr_val / curr_high,
-                                    self._cfg.trailing_stop_atr_multiplier,
-                                    new_sl)
-                    else:
-                        new_sl = curr_high * (1 - trail_dist)
+                    await self._exch_service.cancel_all_take_profits(symbol)
+                    ts.update_trade(trade["id"], runner=True)
                 except Exception:
-                    new_sl = curr_high * (1 - trail_dist)
-            else:
-                new_sl = curr_high * (1 - trail_dist)
+                    pass
+
+            elif current_profit >= 0.15 and stage < 3:
+                new_sl = entry * 1.10
+                self._sl_stage[symbol] = 3
+                logger.info("[TP2-LOCK] %s profit+%.1f%% -> SL raised to +10%%",
+                            symbol, current_profit * 100)
+
+            elif current_profit >= 0.10 and stage < 2:
+                new_sl = entry * 1.04
+                self._sl_stage[symbol] = 2
+                logger.info("[TP1-LOCK] %s profit+%.1f%% -> SL raised to +4%%",
+                            symbol, current_profit * 100)
+
+            elif current_profit >= 0.06 and stage < 1:
+                new_sl = entry * 1.002
+                self._sl_stage[symbol] = 1
+                logger.info("[BREAK-EVEN] %s profit+%.1f%% -> SL at breakeven+0.2%%",
+                            symbol, current_profit * 100)
+
+            if new_sl and new_sl > 0:
+                await self._update_sl(symbol, abs(cur_qty), new_sl, current_profit)
+
+        # cache last known position data for close_trade
+        for pos in positions:
+            s = pos.get("symbol", "")
+            q = float(pos.get("positionAmt", 0) or 0)
+            if abs(q) > 0.001:
+                self._last_pos_data[s] = {
+                    "close_price": float(pos.get("markPrice", 0) or 0),
+                    "unrealized_pnl": float(pos.get("unrealizedProfit", 0) or 0),
+                }
+
+        # cleanup closed positions
+        pos_syms = {p["symbol"] for p in positions if abs(float(p.get("positionAmt",0) or 0)) > 0.001}
+        for t in trades:
+            s = t.get("symbol", "")
+            if s not in pos_syms:
+                ldata = self._last_pos_data.get(s, {})
+                ts.close_trade(t["id"], realized_pnl=ldata.get("unrealized_pnl", 0.0), close_price=ldata.get("close_price", 0.0))
+                logger.info("Cleaned closed trade: " + s)
+
+    async def _update_sl(self, symbol, qty, new_sl, pnl_pct):
+        try:
             await self._exch_service.cancel_all_stop_loss(symbol)
-            qty = float(await self._exch_service.amount_to_precision(symbol, abs(size)))
-            oid = await self._exch_service.place_stop_loss_order(symbol, qty, new_sl)
+            q = float(await self._exch_service.amount_to_precision(symbol, qty))
+            p = self._round_price(symbol, new_sl)
+            oid = await self._exch_service.place_stop_loss_order(symbol, q, p)
             if oid:
-                logger.info("\u79fb\u52a8\u6b62\u635f: %s \u65b0\u9ad8=%.6f(+%.1f%%) SL=%.6f",
-                            symbol, curr_high,
-                            (curr_high / entry - 1) * 100, new_sl)
+                logger.info(f"Trail SL: {symbol} price={new_sl} pnl+{round(pnl_pct*100,1)}pct order={oid}")
+        except Exception as exc:
+            logger.error("Update SL failed " + symbol + ": " + str(exc))
+
+    def _round_price(self, symbol, price):
+        try:
+            return float(self._exch._exch.price_to_precision(symbol, price))
+        except:
+            return round(price, 4)

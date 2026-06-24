@@ -23,7 +23,7 @@ from dashboard import signal_store as ss
 
 def 设置日志(cfg) -> None:
     """配置日志输出。"""
-    handlers: list[logging.Handler] = [logging.StreamHandler(sys.stderr)]
+    handlers: list[logging.Handler] = [logging.StreamHandler(sys.stdout)]
     if cfg.log_file:
         handlers.append(logging.FileHandler(cfg.log_file, encoding="utf-8"))
 
@@ -64,10 +64,8 @@ async def 主异步函数() -> None:
     log.info("  模式: %s", "测试网（模拟）" if cfg.binance_testnet else "实盘")
     log.info("  杠杆: %dx", cfg.leverage)
     log.info("  每笔风险: %.1f%%", cfg.risk_per_trade * 100)
-    log.info("  止损: %.1f%%  止盈: %.1f%%",
-             cfg.stop_loss_pct * 100, cfg.take_profit_pct * 100)
-    log.info("=" * 56)
-    log.warning("[TEST MODE] regime_min_confirm_bars=%d (change to 2+ for live)", cfg.regime_min_confirm_bars)
+    log.info("  止损: ATR自适应(上限5%%)  止盈: ATR自适应(上限20%%)")
+    log.warning("[Test Mode] regime_min_confirm_bars=" + str(cfg.regime_min_confirm_bars) + " (set to 2+ for live)")
 
     exchange_client = ExchangeClient(cfg)
     exchange_service = ExchangeService(exchange_client)

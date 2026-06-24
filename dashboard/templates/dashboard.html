@@ -1,167 +1,497 @@
-﻿<!DOCTYPE html>
-<html lang="zh-CN">
+<!DOCTYPE html>
+<html lang="zh-CN" class="dark">
 <head>
-<meta charset="UTF-8">
-<meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>YSS 交易监控面板</title>
-<link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css" rel="stylesheet">
-<link href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.10.0/font/bootstrap-icons.css" rel="stylesheet">
-<script src="https://cdn.socket.io/4.5.1/socket.io.min.js">
-function updateSignals(){fetch('/api/signals').then(function(r){return r.json();}).then(function(d){if(!d||!d.signals)return;var tb=document.getElementById('signalBody');var h='';for(var i=0;i<d.signals.length&&i<100;i++){var s=d.signals[i];var dc=s.direction==='LONG'?'<span style="color:var(--green)">多</span>':'<span style="color:var(--red)">空</span>';var ts=s.trade_status==='已开单'?'<span class="status-opened">已开单</span>':s.trade_status==='跳过'?'<span class="status-skipped">跳过</span>':s.trade_status==='失败'?'<span class="status-failed">失败</span>':'<span class="status-pending">待定</span>';var sc=s.score>80?'<span style="color:var(--green)">'+s.score+'</span>':'<span>'+s.score+'</span>';h+='<tr><td>'+s.time+'</td><td>'+s.symbol+'</td><td>'+dc+'</td><td>'+(s.price||'-')+'</td><td>'+sc+'</td><td>'+ts+'</td><td>'+(s.alert_count||1)+'次</td></tr>';}tb.innerHTML=h||'<tr><td colspan="7" style="text-align:center;padding:20px 0;color:var(--text-secondary);font-size:11px;">暂无信号</td></tr>';document.getElementById('signalCount').textContent=d.count+'条';}).catch(function(){});}
-</script>
-<style>
-:root{--bg-primary:#0d1117;--bg-card:#161b22;--bg-table:#1c2128;--border:#30363d;--text-primary:#e6edf3;--text-secondary:#8b949e;--green:#3fb950;--red:#f85149;--blue:#58a6ff;--yellow:#d29922}
-*{box-sizing:border-box;margin:0;padding:0}
-body{font-family:-apple-system,BlinkMacSystemFont,"Segoe UI",Helvetica,Arial,sans-serif;background:var(--bg-primary);color:var(--text-primary);padding:20px;height:100vh;overflow:hidden}
-.header{display:flex;justify-content:space-between;align-items:center;padding:12px 0 16px 0;border-bottom:1px solid var(--border)}
-.header h1{font-size:20px;font-weight:600;margin:0}.header h1 i{color:var(--blue);margin-right:8px}
-.header .status-bar{display:flex;align-items:center;gap:16px;font-size:13px;color:var(--text-secondary)}
-.status-dot{display:inline-block;width:8px;height:8px;border-radius:50%;background:var(--green);animation:pulse 1.5s infinite}
-@keyframes pulse{0%,100%{opacity:1}50%{opacity:0.3}}
-@keyframes spin{from{transform:rotate(0deg)}to{transform:rotate(360deg)}}
-.spin{animation:spin 0.6s linear;display:inline-block}
-.summary-row{display:grid;grid-template-columns:repeat(6,1fr);gap:10px;margin:16px 0}
-.summary-card{background:var(--bg-card);border:1px solid var(--border);border-radius:8px;padding:12px 14px}
-.summary-card .label{font-size:11px;color:var(--text-secondary)}.summary-card .value{font-size:20px;font-weight:700;margin-top:4px}
-.summary-card .value.green{color:var(--green)}.summary-card .value.red{color:var(--red)}
-.main-grid{display:flex;gap:16px;height:calc(100vh - 180px)}
-.table-section{flex:1;min-width:0;background:var(--bg-card);border:1px solid var(--border);border-radius:8px;display:flex;flex-direction:column;overflow:hidden}
-.log-section{width:45%;min-width:380px;background:var(--bg-card);border:1px solid var(--border);border-radius:8px;display:flex;flex-direction:column;overflow:hidden}
-.section-header{display:flex;justify-content:space-between;align-items:center;padding:10px 14px;border-bottom:1px solid var(--border);flex-shrink:0}
-.section-header .title{font-size:13px;font-weight:600}
-.table-wrap{overflow:auto;flex:1}
-table{width:100%;border-collapse:collapse;font-size:12px}
-thead th{background:#1a1f26;color:var(--text-secondary);font-weight:600;padding:8px 10px;text-align:right;white-space:nowrap;border-bottom:1px solid var(--border);position:sticky;top:0;z-index:1;cursor:pointer;user-select:none}
-thead th:first-child{text-align:center}thead th:hover{color:var(--text-primary)}
-tbody tr{border-bottom:1px solid rgba(48,54,61,0.3)}tbody tr:hover{background:rgba(88,166,255,0.05)}
-tbody tr.closed{opacity:0.5}
-tbody td{padding:7px 10px;text-align:right;white-space:nowrap;font-family:"SF Mono","Fira Code",monospace;font-size:11px}
-tbody td:first-child{text-align:center;color:var(--text-secondary)}tbody td:last-child{text-align:center}
-.log-container{flex:1;overflow-y:auto;padding:6px 0;font-family:"SF Mono","Fira Code",monospace;font-size:11px}
-.log-entry{display:flex;gap:6px;padding:2px 14px;line-height:1.6}.log-entry:hover{background:rgba(255,255,255,0.03)}
-.log-time{color:var(--text-secondary);white-space:nowrap;flex-shrink:0}
-.status-opened{color:var(--green);font-weight:600}.status-skipped{color:var(--yellow);font-weight:600}.status-failed{color:var(--red);font-weight:600}.status-pending{color:var(--text-secondary)}.log-level-INFO{color:var(--blue)}.log-level-WARN{color:var(--yellow)}.log-level-ERROR{color:var(--red)}
-.log-level-SUCCESS{color:var(--green)}.log-level-INIT{color:var(--text-secondary)}
-.log-level-SIGNAL{color:var(--green)}.log-level-ENTRY{color:var(--green)}.log-level-EXIT{color:var(--red)}.log-level-REJECT{color:var(--red)}.log-level-信号{color:var(--green)}.log-level-开仓{color:var(--green)}.log-level-未开{color:var(--red)}.log-level-WIN{color:var(--green)}.log-level-分析{color:var(--blue)}
-.log-msg{color:var(--text-primary);white-space:nowrap}.log-count{color:var(--text-secondary);font-size:11px}
-.tag-open{color:var(--green)}.tag-closed{color:var(--text-secondary)}.tag-long{color:var(--green)}.tag-short{color:var(--red)}
-.num-green{color:var(--green)}.num-red{color:var(--red)}.num-zero{color:var(--text-secondary)}
-</style>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Richard 监控面板 v4.4</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <script src="https://cdn.jsdelivr.net/npm/echarts@5.4.3/dist/echarts.min.js"></script>
+    <script src="https://cdn.socket.io/4.5.1/socket.io.min.js"></script>
+    <script>
+        tailwind.config = {
+            darkMode: 'class',
+            theme: {
+                extend: {
+                    colors: {
+                        white: {
+                            6: 'rgba(255, 255, 255, 0.06)',
+                            12: 'rgba(255, 255, 255, 0.12)',
+                        }
+                    }
+                }
+            }
+        }
+    </script>
+    <style>
+        * {
+            -webkit-font-smoothing: antialiased;
+            -moz-osx-font-smoothing: grayscale;
+        }
+        /* 深色模式背景与玻璃面板 */
+        html.dark body {
+            background-color: #06070a;
+            background-image: 
+                radial-gradient(at 0% 0%, rgba(29, 78, 216, 0.25) 0px, transparent 50%),
+                radial-gradient(at 100% 0%, rgba(4, 120, 87, 0.15) 0px, transparent 45%),
+                radial-gradient(at 50% 100%, rgba(139, 92, 246, 0.15) 0px, transparent 50%);
+            color: #f1f5f9;
+        }
+        html.dark .glass-panel {
+            background: rgba(13, 17, 28, 0.6);
+            box-shadow: 0 12px 40px rgba(0, 0, 0, 0.5), inset 0 1px 0px rgba(255, 255, 255, 0.15); 
+        }
+        html.dark .glass-panel::before {
+            content: ""; position: absolute; inset: 0; border-radius: inherit; padding: 1px;
+            background: linear-gradient(135deg, rgba(255, 255, 255, 0.3) 0%, rgba(255, 255, 255, 0.02) 50%, rgba(255, 255, 255, 0.15) 100%);
+            -webkit-mask: linear-gradient(#fff 0 0) content-box, linear-gradient(#fff 0 0);
+            -webkit-mask-composite: xor; mask-composite: exclude; pointer-events: none;
+        }
+
+        /* 浅色（白色）模式 */
+        html.light body {
+            background-color: #f1f4f9;
+            background-image: 
+                radial-gradient(at 0% 0%, rgba(186, 230, 253, 0.5) 0px, transparent 50%),
+                radial-gradient(at 100% 0%, rgba(167, 243, 208, 0.4) 0px, transparent 45%);
+            color: #0f172a;
+        }
+        html.light .glass-panel {
+            background: rgba(255, 255, 255, 0.65);
+            box-shadow: 4px 8px 32px rgba(15, 23, 42, 0.05), inset 0 1px 0 rgba(255, 255, 255, 0.6);
+        }
+        html.light .glass-panel::before {
+            content: ""; position: absolute; inset: 0; border-radius: inherit; padding: 1px;
+            background: linear-gradient(135deg, rgba(255, 255, 255, 0.8) 0%, rgba(0, 0, 0, 0.02) 40%, rgba(0, 0, 0, 0.18) 100%);
+            -webkit-mask: linear-gradient(#fff 0 0) content-box, linear-gradient(#fff 0 0);
+            -webkit-mask-composite: xor; mask-composite: exclude; pointer-events: none;
+        }
+
+        body {
+            background-attachment: fixed;
+            transition: background-color 0.4s ease, color 0.4s ease;
+            font-family: -apple-system, BlinkMacSystemFont, "SF Pro Display", sans-serif;
+        }
+        
+        .glass-panel { position: relative; border-radius: 1rem !important; overflow: hidden; backdrop-filter: blur(24px) saturate(140%); -webkit-backdrop-filter: blur(24px) saturate(140%); }
+        .table-scroll-container { max-height: 340px; overflow-y: auto; }
+
+        .table-scroll-container::-webkit-scrollbar, #log-container::-webkit-scrollbar { width: 4px; }
+        .table-scroll-container::-webkit-scrollbar-track, #log-container::-webkit-scrollbar-track { background: transparent; }
+        .table-scroll-container::-webkit-scrollbar-thumb, #log-container::-webkit-scrollbar-thumb { background: rgba(148, 163, 184, 0.2); border-radius: 10px; }
+        
+        @keyframes green-glow { 0%, 100% { box-shadow: 0 0 4px #10b981; background-color: #10b981; } 50% { box-shadow: 0 0 12px #10b981; background-color: #34d399; } }
+        .indicator-green { animation: green-glow 2s infinite ease-in-out; }
+
+        html.dark .table-divide { border-color: rgba(255,255,255,0.08); }
+        html.light .table-divide { border-color: rgba(0,0,0,0.06); }
+        html.dark .row-hover:hover { background: rgba(255,255,255,0.04); }
+        html.light .row-hover:hover { background: rgba(0,0,0,0.03); }
+
+        .common-table { width: 100%; font-size: 0.75rem; }
+        .common-table th { padding: 0.625rem 0.5rem; font-weight: 600; color: #94a3b8; position: sticky; top: 0; z-index: 10; }
+        html.dark .common-table th { background: #0d111c; }
+        html.light .common-table th { background: #f8fafc; }
+        .common-table td { padding: 0.625rem 0.5rem; }
+    </style>
 </head>
-<body>
+<body class="min-h-screen p-6 pb-16">
+    
+    <!-- 头部栏：回归极致纯净 -->
+    <header class="flex justify-between items-center mb-6 px-2">
+        <div class="flex items-center space-x-3">
+            <div id="status-lamp" class="h-3 w-3 rounded-full indicator-green"></div>
+            <h1 class="text-xl font-bold tracking-wider">Richard 监控面板</h1>
+        </div>
+        <div>
+            <!-- 主题切换按钮移动到了原长连接的位置 -->
+            <button onclick="toggleTheme()" class="glass-panel px-4 py-1.5 text-xs font-semibold cursor-pointer hover:scale-105 transition">🌓 <span id="theme-text">切换至浅色模式</span></button>
+        </div>
+    </header>
 
-<div class="header">
-  <h1><i class="bi bi-graph-up-arrow"></i>YSS 交易监控面板</h1>
-  <div class="status-bar">
-    <span id="wsStatus"><span class="status-dot"></span> 就绪</span>
-    <span id="updateTime">—</span>
-    <span id="logCount">0 日志</span>
-  </div>
-</div>
-
-<div class="summary-row" id="summaryCards">
-  <div class="summary-card"><div class="label">账户权益</div><div class="value" id="accountBalance">$0.00</div></div>
-  <div class="summary-card"><div class="label">可用余额</div><div class="value" id="availableBalance">$0.00</div></div>
-  <div class="summary-card"><div class="label">浮动盈亏</div><div class="value" id="totalPnl">0.00</div></div>
-  <div class="summary-card"><div class="label">持仓数量</div><div class="value" id="openCount">0</div></div>
-  <div class="summary-card"><div class="label">保证金占用</div><div class="value" id="totalMargin">0.00</div></div>
-  <div class="summary-card"><div class="label">累计交易</div><div class="value" id="totalTrades">0</div></div>
-</div>
-
-<div class="main-grid">
-  <div class="table-section">
-    <div class="section-header">
-      <span class="title"><i class="bi bi-table me-1"></i>开仓记录</span>
-      <div>
-        <button class="btn btn-sm btn-outline-secondary" onclick="refreshData()" style="font-size:12px;padding:2px 10px;">
-          <i class="bi bi-arrow-repeat"></i> 刷新
-        </button>
-        <span class="badge bg-secondary ms-1" id="liveBadge" style="font-size:10px;">LIVE</span>
-      </div>
+    <!-- 顶部数据快照 -->
+    <div class="grid grid-cols-2 md:grid-cols-5 gap-4 mb-6">
+        <div class="glass-panel p-4"><p class="text-xs text-slate-400 mb-1">账户权益</p><p id="stat-equity" class="text-lg font-extrabold">124,500.00</p></div>
+        <div class="glass-panel p-4"><p class="text-xs text-slate-400 mb-1">可用余额</p><p id="stat-balance" class="text-lg font-extrabold text-emerald-400">98,420.50</p></div>
+        <div class="glass-panel p-4"><p class="text-xs text-slate-400 mb-1">保证金占用</p><p id="stat-margin" class="text-lg font-extrabold">26,079.50</p></div>
+        <div class="glass-panel p-4"><p class="text-xs text-slate-400 mb-1">持仓数量</p><p id="stat-count" class="text-lg font-extrabold text-indigo-400">3</p></div>
+        <div class="glass-panel p-4"><p class="text-xs text-slate-400 mb-1">当前浮动盈亏</p><p id="stat-unrealized" class="text-lg font-extrabold text-emerald-400">+1,450.00</p></div>
     </div>
-    <div class="section-header" style="border-top:1px solid var(--border);">
-      <span class="title"><i class="bi bi-graph-up-arrow me-1"></i>信号</span>
-      <span class="log-count" id="signalCount">0条</span>
+
+    <!-- 主网格划分 -->
+    <div class="grid grid-cols-1 lg:grid-cols-12 gap-6 items-start">
+        <!-- 左侧区域 -->
+        <div class="lg:col-span-7 space-y-6">
+            <!-- 真实持仓列表 -->
+            <div class="glass-panel p-4">
+                <div class="flex justify-between items-center mb-3 pb-2 border-b table-divide">
+                    <h2 class="text-sm font-bold tracking-wider">📊 真实持仓列表</h2>
+                    <button onclick="triggerPanicClose()" class="px-2.5 py-1 bg-red-500/10 hover:bg-red-500/20 border border-red-500/30 text-red-400 rounded text-xs font-bold transition">⚠️ 一键全额清盘</button>
+                </div>
+                <div class="table-scroll-container">
+                    <table class="common-table text-left">
+                        <thead>
+                            <tr class="border-b table-divide">
+                                <th>币种/方向</th><th>开仓均价</th><th class="text-right">实际数量</th><th class="text-right">标记价格</th><th class="text-right">浮动盈亏</th><th class="text-center w-16">操作</th>
+                            </tr>
+                        </thead>
+                        <tbody id="position-table-body" class="divide-y table-divide">
+                            <tr class="row-hover"><td>BTCUSDT <span class="text-[10px] bg-emerald-500/20 text-emerald-400 px-1 rounded">多</span></td><td class="font-mono">64250.0</td><td class="text-right font-mono text-amber-500">0.4500</td><td class="text-right font-mono">64800.0</td><td class="text-right font-mono text-emerald-400">+0.85%</td><td class="text-center"><button class="text-red-400 text-[11px] font-bold">平仓</button></td></tr>
+                            <tr class="row-hover"><td>ETHUSDT <span class="text-[10px] bg-rose-500/20 text-rose-400 px-1 rounded">空</span></td><td class="font-mono">3450.0</td><td class="text-right font-mono text-amber-500">-2.5000</td><td class="text-right font-mono">3410.0</td><td class="text-right font-mono text-emerald-400">+1.16%</td><td class="text-center"><button class="text-red-400 text-[11px] font-bold">平仓</button></td></tr>
+                            <tr class="row-hover"><td>SLXUSDT <span class="text-[10px] bg-emerald-500/20 text-emerald-400 px-1 rounded">多</span></td><td class="font-mono">0.2077</td><td class="text-right font-mono text-amber-500">12000.0</td><td class="text-right font-mono">0.2110</td><td class="text-right font-mono text-emerald-400">+1.58%</td><td class="text-center"><button class="text-red-400 text-[11px] font-bold">平仓</button></td></tr>
+                        </tbody>
+                    </table>
+                </div>
+            </div>
+
+            <!-- 开仓记录 -->
+            <div class="glass-panel p-4">
+                <div class="flex justify-between items-center mb-3 pb-2 border-b table-divide">
+                    <h2 class="text-sm font-bold tracking-wider">📋 开仓记录</h2>
+                    <span id="signal-count" class="text-xs font-mono text-slate-400">3条记录</span>
+                </div>
+                <div class="table-scroll-container">
+                    <table class="common-table text-left">
+                        <thead>
+                            <tr class="border-b table-divide">
+                                <th>时间</th><th class="text-center">币种</th><th class="text-center">方向</th><th class="text-center">触发价</th><th class="text-center">评分</th><th class="text-center">状态</th><th class="text-right">提醒</th>
+                            </tr>
+                        </thead>
+                        <tbody id="signal-table-body" class="divide-y table-divide font-medium">
+                            <tr class="row-hover"><td class="font-mono text-slate-400">17:05:12</td><td class="text-center font-bold">SLXUSDT</td><td class="text-center text-emerald-400">多</td><td class="text-center font-mono">0.2077</td><td class="text-center font-mono">88</td><td class="text-center text-emerald-400">已开仓</td><td class="text-right font-mono text-slate-400">17次</td></tr>
+                        </tbody>
+                    </table>
+                </div>
+            </div>
+
+            <!-- 异步流式日志监控 -->
+            <div class="glass-panel p-4 flex flex-col h-[200px]">
+                <h2 class="text-sm font-bold tracking-wider mb-2">📑 异步流式日志监控</h2>
+                <div id="log-container" class="flex-1 overflow-y-auto font-mono text-[11px] space-y-1 text-slate-400">
+                    <p class="text-slate-500">[17:30:00] 系统核心双轨对齐布局装载完毕...</p>
+                </div>
+            </div>
+        </div>
+
+        <!-- 右侧区域 -->
+        <div class="lg:col-span-5 space-y-6">
+            <!-- 核心信号深度追踪 -->
+            <div class="glass-panel p-4">
+                <h2 class="text-sm font-bold tracking-wider mb-3 pb-2 border-b table-divide">🎯 核心信号深度追踪</h2>
+                <div class="table-scroll-container">
+                    <table class="common-table text-left">
+                        <thead>
+                            <tr class="border-b table-divide">
+                                <th>币种</th><th>首次推送</th><th>标记价格</th><th class="text-right">提醒状态</th>
+                            </tr>
+                        </thead>
+                        <tbody id="detail-tracker-body" class="divide-y table-divide font-mono">
+                            <tr class="row-hover"><td class="font-sans font-bold text-indigo-400">SLXUSDT</td><td class="text-slate-300">0.20774</td><td class="text-emerald-400 font-medium">0.21105</td><td class="text-right"><span class="text-amber-400 bg-amber-500/10 px-1.5 py-0.5 border border-amber-500/20 rounded text-[10px]">次数: 17次</span></td></tr>
+                        </tbody>
+                    </table>
+                </div>
+            </div>
+
+            <!-- 盈亏分析图形看板 -->
+            <div class="glass-panel p-4">
+                <h2 class="text-sm font-bold tracking-wider mb-3 pb-2 border-b table-divide flex justify-between items-center">
+                    <span>📊 盈亏分析</span>
+                    <span class="text-[10px] px-1.5 py-0.5 bg-slate-800 rounded font-mono text-slate-400">ECharts Engine</span>
+                </h2>
+                <div class="space-y-4">
+                    <div>
+                        <p class="text-xs font-bold text-slate-400 mb-1.5 pl-1">📈 近一个月资产变化</p>
+                        <div id="trend-chart" class="w-full h-[180px]"></div>
+                    </div>
+                    <hr class="table-divide">
+                    <div>
+                        <p class="text-xs font-bold text-slate-400 mb-1.5 pl-1">🍩 持仓及财务结构占比</p>
+                        <div id="structure-chart" class="w-full h-[160px]"></div>
+                    </div>
+                </div>
+            </div>
+        </div>
     </div>
-    <div class="table-wrap" style="height:35%;">
-      <table id="signalTable" style="font-size:11px;">
-        <thead><tr>
-          <th>时间</th><th>币种</th><th>方向</th><th>价格</th><th>评分</th><th>开单状态</th><th>提醒</th>
-        </tr></thead>
-        <tbody id="signalBody">
-          <tr><td colspan="7" style="text-align:center;padding:10px 0;color:var(--text-secondary);font-size:11px;">暂无信号</td></tr>
-        </tbody>
-      </table>
-    </div>
-    <div class="table-wrap">
-      <table id="tradeTable">
-        <thead><tr>
-          <th data-sort="id">#</th>
-          <th data-sort="open_time">时间</th>
-          <th data-sort="symbol">品种</th>
-          <th data-sort="direction">方向</th>
-          <th data-sort="entry_price">开仓价</th>
-          <th data-sort="tp">止盈</th>
-          <th data-sort="sl">止损</th>
-          <th data-sort="mark_price">标记价</th>
-          <th data-sort="margin">保证金</th>
-          <th data-sort="unrealized_pnl">浮动盈亏</th>
-          <th data-sort="realized_pnl">已实现</th>
-          <th data-sort="status">状态</th>
-        </tr></thead>
-        <tbody id="tradeBody">
-          <tr><td colspan="12" style="text-align:center;padding:40px 0;color:var(--text-secondary);font-family:sans-serif;">
-            <i class="bi bi-arrow-repeat" style="font-size:20px;display:block;margin-bottom:6px;"></i>等待数据加载...
-          </td></tr>
-        </tbody>
-      </table>
-    </div>
-  </div>
 
-  <div class="log-section">
-    <div class="section-header">
-      <span class="title"><i class="bi bi-terminal me-1"></i>实时日志</span>
-      <input type="text" id="logSearch" placeholder="搜索..." oninput="filterLogs()" style="background:var(--bg-table);border:1px solid var(--border);border-radius:4px;color:var(--text-primary);padding:2px 6px;font-size:11px;width:120px;margin-left:auto;">
-      <span class="log-count" id="logCount2" style="font-size:11px;color:var(--text-secondary);margin-left:8px;">0条</span>
-      <button class="btn btn-sm btn-outline-secondary" onclick="clearLogs()" style="font-size:12px;padding:2px 10px;margin-left:8px;">
-        <i class="bi bi-trash"></i>
-      </button>
-    </div>
-    <div class="log-container" id="logContainer"></div>
-  </div>
+    <!-- 🛠️ 重构后的极简中文固底状态栏 -->
+    <footer class="fixed bottom-0 left-0 right-0 h-7 bg-slate-950/80 dark:bg-black/80 backdrop-blur border-t border-slate-800/60 flex items-center justify-between px-6 text-[10px] font-mono tracking-wider text-slate-400 z-50 select-none">
+        <div class="flex items-center space-x-5">
+            <!-- 1. 长连接状态移至第一顺位 -->
+            <div id="conn-status" class="text-emerald-400 font-bold">🟢 长连接运行中</div>
+            
+            <!-- 2. 全中文本地引擎状态 -->
+            <div class="flex items-center space-x-1 border-l border-slate-800/80 pl-4">
+                <span class="text-slate-500">本地引擎:</span>
+                <span class="text-emerald-400 font-semibold">已启动</span>
+            </div>
+            
+            <!-- 3. 全中文币安延迟数据 -->
+            <div class="flex items-center space-x-1 border-l border-slate-800/80 pl-4">
+                <span class="text-slate-500">币安延迟:</span>
+                <span id="delay-binance" class="text-emerald-400 font-bold transition-all duration-300">5 ms</span>
+            </div>
+        </div>
+        
+        <!-- 4. 去除框线的纯净系统时间戳，靠右对齐 -->
+        <div class="flex items-center space-x-4">
+            <span id="header-timestamp" class="text-slate-300 font-semibold text-[11px]">00:00:00</span>
+            <span class="text-slate-600">|</span>
+            <span class="text-slate-500">Richard Framework 2026</span>
+        </div>
+    </footer>
 
-<script>
-var socket = io();
-var allTrades = [], sortKey = "id", sortAsc = false;
-var allLogs = [], logFilter = "";
+        <script>
+var allTrades = [], allSignals = [], allLogs = [];
+var refreshTimer = null, socket = null;
+function $(id) { return document.getElementById(id); }
+function num(v, d) {
+    if (v === null || v === void 0 || v === '' || isNaN(Number(v))) return '\u2014';
+    v = Number(v);
+    if (d === void 0) d = Math.abs(v) >= 100 ? 2 : Math.abs(v) >= 1 ? 4 : 6;
+    return v.toFixed(d);
+}
+function loadDashboard() {
+    fetch('/api/data').then(function(r){return r.json();}).then(function(data) {
+        if (!data || !data.trades) return;
+        allTrades = data.trades;
+        updateSummary(data.summary);
+        updateAccount(data.account);
+        renderPositionsTable();
+        updateCharts();
+    }).catch(function(){});
+    fetch('/api/signals').then(function(r){return r.json();}).then(function(d) {
+        if (!d || !d.signals) return;
+        allSignals = d.signals;
+        renderSignalsTable();
+        renderDetailTracker();
+        $('signal-count').textContent = d.count + '\u6761\u8bb0\u5f55';
+    }).catch(function(){});
+}
+function updateSummary(s) {
+    if (!s) return;
+    $('stat-count').textContent = s.open_count || 0;
+    $('stat-margin').textContent = Number(s.total_margin || 0).toFixed(2);
+    var v = s.total_pnl || 0;
+    var el = $('stat-unrealized');
+    el.textContent = (v > 0 ? '+' : '') + Number(v).toFixed(2);
+    el.className = 'text-lg font-extrabold ' + (v > 0 ? 'text-emerald-400' : v < 0 ? 'text-rose-500' : '');
+}
+function updateAccount(a) {
+    if (!a) return;
+    $('stat-equity').textContent = Number(a.total_balance || 0).toFixed(2);
+    $('stat-balance').textContent = Number(a.available_balance || 0).toFixed(2);
+}
+function renderPositionsTable() {
+    var tb = $('position-table-body');
+    var open = allTrades.filter(function(t){return t.status === 'OPEN';});
+    if (!open.length) {
+        tb.innerHTML = '<tr><td colspan="6" class="text-center text-slate-500 py-8 text-xs">\u6682\u65e0\u6301\u4ed3</td></tr>';
+        return;
+    }
+    var html = '';
+    for (var i = 0; i < open.length; i++) {
+        var p = open[i];
+        var isLong = p.direction === 'LONG';
+        var dirText = isLong ? '\u591a' : '\u7a7a';
+        var dirColor = isLong ? '#10b981' : '#f43f5e';
+        var qty = Number(p.position_size || p.qty || 0);
+        var upnl = Number(p.unrealized_pnl || 0);
+        var pnlColor = upnl >= 0 ? '#10b981' : '#f43f5e';
+        var pnlSign = upnl >= 0 ? '+' : '';
+        html += '<tr class="row-hover">' +
+            '<td>' + p.symbol + ' <span style="font-size:10px;background:' + dirColor + '33;color:' + dirColor + ';padding:0 6px;border-radius:4px">' + dirText + '</span></td>' +
+            '<td class="font-mono">' + num(p.entry_price) + '</td>' +
+            '<td class="text-right font-mono" style="color:#f59e0b">' + num(qty, 4) + '</td>' +
+            '<td class="text-right font-mono">' + num(p.mark_price) + '</td>' +
+            '<td class="text-right font-mono" style="color:' + pnlColor + '">' + pnlSign + upnl.toFixed(2) + '</td>' +
+            '<td class="text-center"><button onclick="closePosition(\'' + p.symbol + '\')" style="color:#f43f5e;font-size:11px;font-weight:700;background:none;border:none;cursor:pointer">\u5e73\u4ed3</button></td>' +
+        '</tr>';
+    }
+    tb.innerHTML = html;
+}
+function renderSignalsTable() {
+    var tb = $('signal-table-body');
+    if (!allSignals.length) {
+        tb.innerHTML = '<tr><td colspan="7" class="text-center text-slate-500 py-8 text-xs">\u6682\u65e0\u4fe1\u53f7</td></tr>';
+        return;
+    }
+    var html = '';
+    var n = Math.min(allSignals.length, 50);
+    for (var i = 0; i < n; i++) {
+        var s = allSignals[i];
+        var isLong = s.direction === 'LONG';
+        var dirColor = isLong ? '#10b981' : '#f43f5e';
+        var dirText = isLong ? '\u591a' : '\u7a7a';
+        var statusText = s.trade_status || '\u5f85\u5b9a';
+        var statusColor = '#94a3b8';
+        if (statusText === '\u5df2\u5f00\u5355') statusColor = '#10b981';
+        else if (statusText === '\u8df3\u8fc7') statusColor = '#f59e0b';
+        else if (statusText === '\u5931\u8d25') statusColor = '#f43f5e';
+        var score = Number(s.score || 0);
+        html += '<tr class="row-hover">' +
+            '<td class="font-mono text-slate-400">' + (s.time || '\u2014') + '</td>' +
+            '<td class="text-center font-bold">' + (s.symbol || '') + '</td>' +
+            '<td class="text-center" style="color:' + dirColor + '">' + dirText + '</td>' +
+            '<td class="text-center font-mono">' + num(s.price) + '</td>' +
+            '<td class="text-center font-mono" style="color:' + (score >= 80 ? '#10b981' : '#94a3b8') + '">' + score + '</td>' +
+            '<td class="text-center" style="color:' + statusColor + '">' + statusText + '</td>' +
+            '<td class="text-right font-mono text-slate-400">' + (s.alert_count || 1) + '\u6b21</td>' +
+        '</tr>';
+    }
+    tb.innerHTML = html;
+}
+function renderDetailTracker() {
+    var tb = $('detail-tracker-body');
+    if (!tb) return;
+    var map = {};
+    for (var i = 0; i < allSignals.length; i++) {
+        var s = allSignals[i], sym = s.symbol;
+        if (!sym) continue;
+        if (!map[sym]) map[sym] = { firstPrice: s.price, count: 0 };
+        map[sym].count += (s.alert_count || 1);
+    }
+    var mk = {};
+    for (var i = 0; i < allTrades.length; i++) {
+        if (allTrades[i].symbol && allTrades[i].mark_price) mk[allTrades[i].symbol] = allTrades[i].mark_price;
+    }
+    var keys = Object.keys(map);
+    if (!keys.length) {
+        tb.innerHTML = '<tr><td colspan="4" class="text-center text-slate-500 py-8 text-xs">\u6682\u65e0\u4eca\u65e5\u4fe1\u53f7</td></tr>';
+        return;
+    }
+    var html = '';
+    for (var i = 0; i < keys.length; i++) {
+        var sym = keys[i], e = map[sym];
+        var mp = mk[sym] || e.firstPrice || '\u2014';
+        html += '<tr class="row-hover">' +
+            '<td class="font-sans font-bold text-indigo-400">' + sym + '</td>' +
+            '<td class="text-slate-300">' + num(e.firstPrice) + '</td>' +
+            '<td style="color:#10b981;font-weight:500">' + num(mp) + '</td>' +
+            '<td class="text-right"><span style="color:#f59e0b;background:rgba(245,158,11,0.1);padding:0 6px;border:1px solid rgba(245,158,11,0.2);border-radius:4px;font-size:10px">\u6b21\u6570: ' + e.count + '\u6b21</span></td>' +
+        '</tr>';
+    }
+    tb.innerHTML = html;
+}
+function initSocketIO() {
+    socket = io();
+    socket.on('connect', function() {
+        $('status-lamp').className = 'h-3 w-3 rounded-full indicator-green';
+        $('conn-status').innerHTML = '\u25cf \u957f\u8fde\u63a5\u8fd0\u884c\u4e2d';
+        socket.emit('request_logs');
+    });
+    socket.on('disconnect', function() {
+        $('status-lamp').className = 'h-3 w-3 rounded-full';
+        $('status-lamp').style.background = '#f43f5e';
+        $('conn-status').innerHTML = '\u25cf \u957f\u8fde\u63a5\u5df2\u65ad\u5f00';
+    });
+    socket.on('log', function(entry) { addLogEntry(entry); });
+}
+function addLogEntry(entry) {
+    allLogs.push(entry);
+    if (allLogs.length > 500) allLogs.shift();
+    renderLogs();
+}
+function renderLogs() {
+    var c = $('log-container');
+    var html = '';
+    for (var i = 0; i < allLogs.length; i++) {
+        var e = allLogs[i], lv = e.level || 'INFO';
+        html += '<p><span class="text-slate-500">[' + e.time + ']</span> <span class="log-level-' + lv + '">[' + lv + ']</span> <span class="text-slate-300">' + (e.message || '') + '</span></p>';
+    }
+    c.innerHTML = html;
+    c.scrollTop = c.scrollHeight;
+}
+function closePosition(symbol) {
+    if (!confirm('\u786e\u8ba4\u5e73\u4ed3 ' + symbol + ' \u5417\uff1f')) return;
+    fetch('/api/close_position', {
+        method: 'POST',
+        headers: {'Content-Type': 'application/json'},
+        body: JSON.stringify({symbol: symbol})
+    }).then(function(r){return r.json();}).then(function(d) {
+        if (d.success) { loadDashboard(); }
+        else { alert('\u5e73\u4ed3\u5931\u8d25: ' + (d.error || '\u672a\u77e5\u9519\u8bef')); }
+    }).catch(function(e){ alert('\u8bf7\u6c42\u5931\u8d25: ' + e.message); });
+}
+function triggerPanicClose() {
+    if (!confirm('\u26a0\ufe0f \u786e\u8ba4\u4e00\u952e\u6e05\u7a7a\u6240\u6709\u4ed3\u4f4d\u5417\uff1f\u6b64\u64cd\u4f5c\u4e0d\u53ef\u64a4\u9500\uff01')) return;
+    fetch('/api/close_all_positions', {method: 'POST'})
+        .then(function(r){return r.json();}).then(function(d) {
+            if (d.success) { loadDashboard(); }
+            else { alert('\u6e05\u4ed3\u5931\u8d25: ' + (d.error || '\u672a\u77e5\u9519\u8bef')); }
+        }).catch(function(e){ alert('\u8bf7\u6c42\u5931\u8d25: ' + e.message); });
+}
+var trendChart = null, structChart = null;
+function initCharts() {
+    trendChart = echarts.init($('trend-chart'), 'dark');
+    trendChart.setOption({
+        backgroundColor: 'transparent',
+        tooltip: {trigger: 'axis'},
+        grid: {top: '15%', bottom: '15%', left: '12%', right: '5%'},
+        xAxis: {type: 'category', data: ['1\u6708','2\u6708','3\u6708','4\u6708','5\u6708','6\u6708'], axisLine: {lineStyle: {color: 'rgba(255,255,255,0.1)'}}},
+        yAxis: {type: 'value', name: 'USD', splitLine: {lineStyle: {color: 'rgba(255,255,255,0.05)'}}},
+        series: [{name: '\u8d44\u4ea7\u51c0\u503c\u53d8\u5316', type: 'bar', data: [1200,-800,2400,3100,-500,1800], itemStyle: {color: function(p){return p.value>=0?'#3b82f6':'#f43f5e';}}}]
+    });
+    structChart = echarts.init($('structure-chart'), 'dark');
+    structChart.setOption({
+        backgroundColor: 'transparent',
+        tooltip: {trigger: 'item'},
+        legend: {orient: 'vertical', right: '5%', top: 'center', textStyle: {color: '#94a3b8', fontSize: 11}},
+        series: [{name: '\u6301\u4ed3\u5e01\u79cd\u6743\u91cd', type: 'pie', radius: ['50%','80%'], center: ['35%','50%'], label: {show: true, position: 'center', formatter: '\u6682\u65e0\u6570\u636e', fontSize: 12, fontWeight: 'bold', color: '#94a3b8'}, data: []}]
+    });
+    window.addEventListener('resize', function(){if(trendChart)trendChart.resize();if(structChart)structChart.resize();});
+}
+function updateCharts() {
+    if (!structChart) return;
+    var open = allTrades.filter(function(t){return t.status === 'OPEN';});
+    if (open.length === 0) return;
+    var pieData = [], totalVal = 0;
+    var colors = ['#3b82f6','#6366f1','#0ea5e9','#10b981','#f59e0b','#f43f5e','#8b5cf6'];
+    for (var i = 0; i < open.length; i++) {
+        var p = open[i];
+        var qty = Math.abs(Number(p.position_size || p.qty || 0));
+        var mp = Number(p.mark_price || p.entry_price || 0);
+        var val = qty * mp;
+        totalVal += val;
+        pieData.push({name: p.symbol, value: Math.round(val*100)/100});
+    }
+    structChart.setOption({
+        series: [{data: pieData.map(function(d,idx){
+            var pct = totalVal>0 ? (d.value/totalVal*100).toFixed(1) : 0;
+            return {value: d.value, name: d.name+' ('+pct+'%)', itemStyle: {color: colors[idx%colors.length]}};
+        }), label: {formatter: totalVal.toFixed(2)+'\nUSD'}}]
+    });
+}
+function startAutoRefresh() {
+    loadDashboard();
+    if (refreshTimer) clearInterval(refreshTimer);
+    refreshTimer = setInterval(loadDashboard, 5000);
+}
+function startLiveClock() {
+    var el = $('header-timestamp');
+    function tick() {
+        var d = new Date();
+        el.innerText = [d.getHours(), d.getMinutes(), d.getSeconds()].map(function(n){return String(n).padStart(2,'0');}).join(':');
+    }
+    tick();
+    setInterval(tick, 1000);
+}
+function toggleTheme() {
+    var h = document.documentElement;
+    if (h.classList.contains('dark')) {
+        h.classList.remove('dark'); h.classList.add('light');
+        $('theme-text').textContent = '\u5207\u6362\u81f3\u6697\u8272\u6a21\u5f0f';
+    } else {
+        h.classList.remove('light'); h.classList.add('dark');
+        $('theme-text').textContent = '\u5207\u6362\u81f3\u6d45\u8272\u6a21\u5f0f';
+    }
+    setTimeout(function(){window.dispatchEvent(new Event('resize'));}, 100);
+}
+window.addEventListener('DOMContentLoaded', function() {
+    initCharts();
+    startLiveClock();
+    initSocketIO();
+    startAutoRefresh();
+});
+    </script>
 
-function nc(v,d){if(d===undefined)d=2;if(v===null||v===undefined||isNaN(v))return'<span class="num-zero">—</span>';var c=v>0?'num-green':'num-red';return'<span class="'+c+'">'+(v>0?'+':'')+Number(v).toFixed(d)+'</span>';}
-function nz(v,d){if(d===undefined)d=8;if(v===null||v===undefined||isNaN(v))return'—';return Number(v).toFixed(d);}
-function sb(s){if(s==='OPEN')return'<span class="tag-open"><i class="bi bi-circle-fill" style="font-size:7px;margin-right:4px;"></i>持仓中</span>';return'<span class="tag-closed">已平仓</span>';}
-function db(d){if(d==='LONG')return'<span class="tag-long"><i class="bi bi-arrow-up-short"></i>多</span>';if(d==='SHORT')return'<span class="tag-short"><i class="bi bi-arrow-down-short"></i>空</span>';return d||'—';}
-
-function render(data){allTrades=data.trades||[];applySort();updateSummary(data.summary);updateAccount(data.account);document.getElementById('updateTime').textContent='更新: '+(data.timestamp||'—');}
-function applySort(){var r=[...allTrades].sort(function(a,b){var va=a[sortKey],vb=b[sortKey];if(typeof va==='string')va=va.toLowerCase();if(typeof vb==='string')vb=vb.toLowerCase();if(va===null||va===undefined)va='';if(vb===null||vb===undefined)vb='';return(sortAsc?1:-1)*(va<vb?-1:va>vb?1:0);});renderTable(r);}
-function renderTable(rows){var tb=document.getElementById('tradeBody');if(!rows.length){tb.innerHTML='<tr><td colspan="12" style="text-align:center;padding:30px 0;color:var(--text-secondary);font-family:sans-serif;"><i class="bi bi-inbox" style="font-size:20px;display:block;margin-bottom:6px;"></i>暂无交易记录</td></tr>';return;}var h='';for(var i=0;i<rows.length;i++){var r=rows[i];var cls=r.status==='CLOSED'?'closed':'';h+='<tr class="'+cls+'"><td>'+(r.id||'—')+'</td><td>'+(r.open_time||'—')+'</td><td>'+(r.symbol||'—')+'</td><td>'+db(r.direction)+'</td><td>'+nz(r.entry_price)+'</td><td>'+nz(r.tp)+'</td><td>'+nz(r.sl)+'</td><td>'+nz(r.mark_price)+'</td><td>'+nz(r.margin,2)+'</td><td>'+nc(r.unrealized_pnl)+'</td><td>'+nc(r.realized_pnl)+'</td><td>'+sb(r.status)+'</td></tr>';}tb.innerHTML=h;}
-function updateSummary(s){if(!s)return;document.getElementById('openCount').textContent=s.open_count||0;document.getElementById('totalMargin').textContent=Number(s.total_margin||0).toFixed(2);document.getElementById('totalTrades').textContent=s.total_trades||0;var el=document.getElementById('totalPnl');var v=s.total_pnl||0;el.textContent=(v>0?'+':'')+Number(v).toFixed(2);el.className='value'+(v>0?' green':v<0?' red':'');}
-function updateAccount(acct){if(!acct)return;document.getElementById('accountBalance').textContent='$'+(acct.total_balance||0).toFixed(2);document.getElementById('availableBalance').textContent='$'+(acct.available_balance||0).toFixed(2);}
-
-document.querySelectorAll('thead th[data-sort]').forEach(function(th){th.addEventListener('click',function(){var key=th.dataset.sort;if(key===sortKey)sortAsc=!sortAsc;else{sortKey=key;sortAsc=false;}document.querySelectorAll('thead th i.bi').forEach(function(i){i.remove();});var icon=document.createElement('i');icon.className=sortAsc?'bi bi-caret-up-fill':'bi bi-caret-down-fill';th.appendChild(icon);applySort();});});
-
-function addLogEntry(entry){allLogs.push(entry);if(allLogs.length>500)allLogs.shift();renderLogs();document.getElementById('logCount').textContent=allLogs.length+'日志';document.getElementById('logCount2').textContent=allLogs.length+'条';}
-function renderLogs(){var c=document.getElementById('logContainer');var items=logFilter?allLogs.filter(function(e){return e.message.toLowerCase().includes(logFilter);}):allLogs;var h='';for(var i=0;i<items.length;i++){var e=items[i];h+='<div class="log-entry"><span class="log-time">'+e.time+'</span><span class="log-level-'+e.level+'">['+e.level+']</span><span class="log-msg">'+e.message+'</span></div>';}c.innerHTML=h;c.scrollTop=c.scrollHeight;}
-function filterLogs(){logFilter=document.getElementById('logSearch').value.toLowerCase();renderLogs();}
-function clearLogs(){allLogs=[];document.getElementById('logContainer').innerHTML='';document.getElementById('logCount').textContent='0日志';document.getElementById('logCount2').textContent='0条';}
-
-socket.on('connect',function(){document.getElementById('wsStatus').innerHTML='<span class="status-dot"></span>就绪';socket.emit('request_logs');});
-socket.on('disconnect',function(){document.getElementById('wsStatus').innerHTML='<span class="status-dot" style="background:var(--red);"></span>断开';});
-socket.on('log',function(entry){addLogEntry(entry);});
-
-function refreshData(){var btn=document.querySelector('.btn-outline-secondary i');if(btn)btn.className='bi bi-arrow-repeat spin';fetch('/api/data').then(function(r){return r.json();}).then(function(data){if(data&&data.trades)render(data);}).catch(function(){}).finally(function(){if(btn)setTimeout(function(){btn.className='bi bi-arrow-repeat';},600);});fetch('/api/account').then(function(r){return r.json();}).then(function(acct){if(acct&&acct.total_balance!==undefined)updateAccount(acct);}).catch(function(){});updateSignals();}
-setInterval(function(){refreshData();},5000);refreshData();
-
-function updateSignals(){fetch('/api/signals').then(function(r){return r.json();}).then(function(d){if(!d||!d.signals)return;var tb=document.getElementById('signalBody');var h='';for(var i=0;i<d.signals.length&&i<100;i++){var s=d.signals[i];var dc=s.direction==='LONG'?'<span style="color:var(--green)">多</span>':'<span style="color:var(--red)">空</span>';var ts=s.trade_status==='已开单'?'<span class="status-opened">已开单</span>':s.trade_status==='跳过'?'<span class="status-skipped">跳过</span>':s.trade_status==='失败'?'<span class="status-failed">失败</span>':'<span class="status-pending">待定</span>';var sc=s.score>80?'<span style="color:var(--green)">'+s.score+'</span>':'<span>'+s.score+'</span>';h+='<tr><td>'+s.time+'</td><td>'+s.symbol+'</td><td>'+dc+'</td><td>'+(s.price||'-')+'</td><td>'+sc+'</td><td>'+ts+'</td><td>'+(s.alert_count||1)+'次</td></tr>';}tb.innerHTML=h||'<tr><td colspan="7" style="text-align:center;padding:20px 0;color:var(--text-secondary);font-size:11px;">暂无信号</td></tr>';document.getElementById('signalCount').textContent=d.count+'条';}).catch(function(){});}
-</script>
 </body>
 </html>
-

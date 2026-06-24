@@ -54,6 +54,14 @@ class RiskManager:
         # 原始数量（交易所精度舍入由 exchange 层负责）
         raw_qty = risk_amount / sl_distance
 
+        # 保证金上限截断：每笔最多占可用余额的 10%
+        max_margin = balance_usdt * 0.10
+        max_qty_by_margin = max_margin * self._cfg.leverage / entry_price
+        if max_qty_by_margin > 0 and max_qty_by_margin < raw_qty:
+            logger.info('  保证金上限截断: risk_qty=%.2f → margin_qty=%.2f (保证金$%.2f=10%%)',
+                        raw_qty, max_qty_by_margin, max_margin)
+            raw_qty = max_qty_by_margin
+
         result = {
             "qty": raw_qty,
             "sl": sl_price,
