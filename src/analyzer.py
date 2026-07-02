@@ -221,7 +221,7 @@ class TechnicalAnalyzer:
                     raw_size *= 0.7  # 震荡市仓位打七折，防来回双劈
                 result["suggested_position_size_pct"] = round(min(raw_size, 1.0) * 100, 2)  # 最大不超过名义 100% 杠杆单位
 
-            # C. 阶梯止盈
+            # C. 阶梯止盈 (50%%+30%%+20%%=100%%, TP3打完全仓清空)
             tp_scale = 1.3 if result["regime"] == "TRENDING" else 0.8
             result["tp_levels"] = [
                 {"price": round(current_price * (1 + m_4h["atr_pct"] * 2.0 * tp_scale), 10), "qty_pct": 0.5, "label": "TP1"},

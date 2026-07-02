@@ -53,6 +53,8 @@ from core.exchange_service import ExchangeService
 from src.risk_manager import RiskManager
 
 from src.analyzer import TechnicalAnalyzer
+from src import dedup_service
+from src.position_service import PositionService
 
 from dashboard import trade_store as ts
 
@@ -87,15 +89,13 @@ class SignalHandler:
 
         self._analyzer = TechnicalAnalyzer(self._exchange_service)
 
-        self._dedup: set[str] = set()
+        self._active_signals: set[tuple[str, str, int]] = set()
 
-        self._dedup_file = os.path.join(
+        self._pos_service = PositionService(self._exchange)
 
-            os.path.dirname(os.path.dirname(os.path.abspath(__file__))),
+        self._symbol_locks: dict[str, asyncio.Lock] = {}
 
-            "dedup.json",
-
-        )
+        self._dedup: dict[str, dict] = {}
 
         self._加载去重记录()
 
@@ -116,42 +116,21 @@ class SignalHandler:
 
 
     def _加载去重记录(self) -> None:
-
-        """从文件加载持久化的去重记录。"""
-
-        try:
-
-            with open(self._dedup_file, "r") as f:
-
-                data = json.load(f)
-
-                if isinstance(data, dict):
-
-                    self._dedup = set(data.keys())
-
-                    logger.info("已加载 %d 条去重记录", len(self._dedup))
-
-        except (FileNotFoundError, json.JSONDecodeError):
-
-            self._dedup = set()
+        self._dedup = dedup_service.load()
+        logger.info("已加载 %d 条去重记录", len(self._dedup))
 
 
 
-    def _标记去重(self, symbol: str) -> None:
+    def _标记去重(self, symbol: str, direction: str = "", alert_count: int = 0) -> None:
+        """标记信号已处理（内存层），防止同一信号被重复处理。"""
+        key = (symbol, direction, alert_count)
+        self._active_signals.add(key)
 
-        """标记合约已处理，持久化到文件。"""
-
-        self._dedup.add(symbol)
-
-        try:
-
-            with open(self._dedup_file, "w") as f:
-
-                json.dump({s: time.time() for s in self._dedup}, f, indent=2)
-
-        except Exception as exc:
-
-            logger.warning("去重记录保存失败: %s", exc)
+    def _清除去重(self, symbol: str) -> None:
+        """清除内存中去重记录，更新持久化状态为 CLOSED。"""
+        to_remove = {k for k in self._active_signals if k[0] == symbol}
+        self._active_signals -= to_remove
+        dedup_service.set_status(symbol, "CLOSED")
 
 
 
@@ -321,6 +300,22 @@ class SignalHandler:
 
 
 
+
+        # 第4步：双层去重（内存 + 持久化）
+        signal_key = (contract_symbol, signal_type.upper(), alert_count)
+        if signal_key in self._active_signals:
+            logger.info("【第4步】信号 %s 已处理，跳过", contract_symbol)
+            return
+        dedup_entry = self._dedup.get(contract_symbol, {})
+        if dedup_entry.get("status") == "OPEN":
+            if self._pos_service and self._pos_service.has_open_position(contract_symbol):
+                logger.info("【第4步】合约 %s 已有活跃持仓，跳过", contract_symbol)
+                return
+            else:
+                self._清除去重(contract_symbol)
+                logger.info("【第4步】清理 %s 的过期去重记录", contract_symbol)
+        self._标记去重(contract_symbol, signal_type.upper(), alert_count)
+        logger.info("【第4步】去重检查通过")
         # ════════════════════════════════════════════
 
         # 第5步：检查合约存在
@@ -350,7 +345,7 @@ class SignalHandler:
                 logger.info("【第6步】%s 已有奔跑模式仓位，不影响新开仓", contract_symbol)
             else:
                 logger.info("【第6步】合约 %s 已有持仓，跳过重复开仓", contract_symbol)
-                self._标记去重(contract_symbol)
+                self._标记去重(contract_symbol, signal_type.upper(), alert_count)
                 return
 
 
@@ -383,8 +378,8 @@ class SignalHandler:
 
         # ════════════════════════════════════════════
 
-        open_count = self._exchange.get_open_positions_count()
-                # 奔跑模式仓位不阻止新开仓?
+        open_count = self._pos_service.get_open_positions_count() if self._pos_service else 0
+        # 奔跑模式仓位不阻止新开仓?
         _runner_cnt = sum(1 for t in ts.load_all() if t.get("status") == "OPEN" and t.get("runner"))
         effective_count = open_count - _runner_cnt
 
@@ -398,7 +393,7 @@ class SignalHandler:
 
             )
 
-            self._标记去重(contract_symbol)
+            self._标记去重(contract_symbol, signal_type.upper(), alert_count)
 
             return
 
@@ -464,7 +459,7 @@ class SignalHandler:
 
             )
 
-            self._标记去重(contract_symbol)
+            self._标记去重(contract_symbol, signal_type.upper(), alert_count)
 
             return
 
@@ -533,7 +528,7 @@ class SignalHandler:
 
             await self._执行市价开仓(contract_symbol, msg_price, balance)
 
-            self._标记去重(contract_symbol)
+            self._标记去重(contract_symbol, signal_type.upper(), alert_count)
 
             return
 
@@ -702,7 +697,7 @@ class SignalHandler:
 
 
 
-        self._标记去重(contract_symbol)
+        self._标记去重(contract_symbol, signal_type.upper(), alert_count)
 
 
 
@@ -826,6 +821,24 @@ class SignalHandler:
 
 
 
+
+        # 第4步：双层去重（内存 + 持久化）
+        sig_type = signal.get("signal_type", "LONG").upper()
+        sig_count = signal.get("alert_count", 0)
+        signal_key = (contract_symbol, sig_type, sig_count)
+        if signal_key in self._active_signals:
+            logger.info("【第4步】信号 %s 已处理，跳过", contract_symbol)
+            return
+        dedup_entry = self._dedup.get(contract_symbol, {})
+        if dedup_entry.get("status") == "OPEN":
+            if self._pos_service and self._pos_service.has_open_position(contract_symbol):
+                logger.info("【第4步】合约 %s 已有活跃持仓，跳过", contract_symbol)
+                return
+            else:
+                self._清除去重(contract_symbol)
+                logger.info("【第4步】清理 %s 的过期去重记录", contract_symbol)
+        self._标记去重(contract_symbol, sig_type, sig_count)
+        logger.info("【第4步】去重检查通过")
         # ════════════════════════════════════════════
 
         # 第5步：检查合约存在
@@ -852,7 +865,7 @@ class SignalHandler:
 
             logger.info("【第6步】合约 %s 已有持仓，跳过重复开仓", contract_symbol)
 
-            self._标记去重(contract_symbol)
+            self._标记去重(contract_symbol, sig_type, sig_count)
 
             return
 
@@ -884,7 +897,7 @@ class SignalHandler:
 
         # ════════════════════════════════════════════
 
-        open_count = self._exchange.get_open_positions_count()
+        open_count = self._pos_service.get_open_positions_count() if self._pos_service else 0
 
         if open_count >= self._cfg.max_open_positions:
 
@@ -896,7 +909,7 @@ class SignalHandler:
 
             )
 
-            self._标记去重(contract_symbol)
+            self._标记去重(contract_symbol, sig_type, sig_count)
 
             return
 
@@ -962,7 +975,7 @@ class SignalHandler:
 
             )
 
-            self._标记去重(contract_symbol)
+            self._标记去重(contract_symbol, sig_type, sig_count)
 
             return
 
@@ -1031,7 +1044,7 @@ class SignalHandler:
 
             await self._执行市价开仓(contract_symbol, msg_price, balance)
 
-            self._标记去重(contract_symbol)
+            self._标记去重(contract_symbol, sig_type, sig_count)
 
             return
 
@@ -1197,7 +1210,7 @@ class SignalHandler:
 
 
 
-        self._标记去重(contract_symbol)
+        self._标记去重(contract_symbol, sig_type, sig_count)
 
 
 

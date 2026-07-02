@@ -15,6 +15,18 @@ TRADE_FILE = os.path.join(
 _lock = threading.Lock()
 
 
+def normalize_symbol(symbol: str) -> str:
+    """标准化为 Binance 合约格式（如 BTCUSDT），在所有入口处强制统一。"""
+    s = symbol.upper().strip()
+    if "/" in s:
+        s = s.replace("/", "")
+    if "-" in s:
+        s = s.replace("-", "")
+    if not s.endswith("USDT"):
+        s += "USDT"
+    return s
+
+
 def load_all() -> list[dict]:
     """加载所有交易记录。"""
     if not os.path.exists(TRADE_FILE):
@@ -48,6 +60,9 @@ def add_trade(trade_data: dict) -> dict:
         "funding_fee": 0.0,
     }
     record.update(trade_data)
+    # 在写入前强制标准化 symbol
+    if "symbol" in record:
+        record["symbol"] = normalize_symbol(record["symbol"])
     trades.append(record)
     save_all(trades)
     return record
@@ -64,12 +79,20 @@ def update_trade(trade_id: int, **updates) -> dict | None:
     return None
 
 
-def close_trade(trade_id: int, realized_pnl: float, close_price: float) -> dict | None:
+def close_trade(
+    trade_id: int,
+    realized_pnl: float | None = None,
+    close_price: float | None = None,
+    close_reason: str = "SYNC",
+) -> dict | None:
     """标记交易为已平仓。"""
-    return update_trade(
-        trade_id,
-        status="CLOSED",
-        close_time=datetime.now().strftime("%Y-%m-%d %H:%M:%S"),
-        realzed_pnl=round(realized_pnl, 4),
-        close_price=close_price,
-    )
+    updates: dict[str, Any] = {
+        "status": "CLOSED",
+        "close_time": datetime.now().strftime("%Y-%m-%d %H:%M:%S"),
+        "close_reason": close_reason,
+    }
+    if realized_pnl is not None:
+        updates["realized_pnl"] = round(realized_pnl, 4)
+    if close_price is not None:
+        updates["close_price"] = close_price
+    return update_trade(trade_id, **updates)

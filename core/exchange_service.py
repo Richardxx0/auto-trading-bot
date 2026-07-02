@@ -150,14 +150,15 @@ class ExchangeService:
 
     # ── 杠杆 ────────────────────────────────────────────────
 
-    async def set_leverage(self, symbol: str, leverage: int) -> None:
+    async def set_leverage(self, symbol: str, leverage: int) -> bool:
         try:
             await self.run(
                 self._exch.set_leverage, symbol, leverage,
                 timeout=self.TIMEOUTS["leverage"],
             )
+            return True
         except Exception:
-            pass
+            return False
 
     # ── 开仓 ────────────────────────────────────────────────
 

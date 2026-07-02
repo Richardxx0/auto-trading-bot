@@ -74,9 +74,9 @@ class ExchangeClient:
         """获取合约账户 USDT 余额（可用 + 冻结）。"""
         try:
             balance = self._exch.fetch_balance()
-            total = float(balance.get("USDT", {}).get("total", 0))
-            logger.info("合约账户 USDT 余额: %.2f", total)
-            return total
+            free = float(balance.get("USDT", {}).get("free", 0))
+            logger.info("???? USDT ????: %.2f", free)
+            return free
         except Exception as exc:
             logger.error("获取余额失败: %s", exc)
             return 0.0
@@ -111,13 +111,15 @@ class ExchangeClient:
             logger.warning('  check %s number cap failed: %s', symbol, exc)
             return raw_qty
 
-    def set_leverage(self, symbol: str, leverage: int) -> None:
+    def set_leverage(self, symbol: str, leverage: int) -> bool:
         """设置合约杠杆倍数。"""
         try:
             self._exch.set_leverage(leverage, symbol)
             logger.info("合约 %s 杠杆设为 %dx", symbol, leverage)
+            return True
         except Exception as exc:
             logger.warning("设置 %s 杠杆失败: %s", symbol, exc)
+            return False
 
     def query_position(self, symbol: str) -> dict | None:
         """查询 *symbol* 的当前持仓。有持仓返回字典，无持仓返回 None。"""
@@ -223,8 +225,32 @@ class ExchangeClient:
         except Exception as exc:
             err_msg = f"市价开仓失败 {symbol}: {exc}"
             logger.error(err_msg)
-            results["error"] = err_msg
-            return results
+            # 限仓降杠杆重试: -2027 = exceeded max position at current leverage
+            if "-2027" in str(exc):
+                logger.info("触发限仓降杠杆: %s 尝试 5x + 半仓重试", symbol)
+                try:
+                    self.set_leverage(symbol, 5)
+                    qty_retry = float(self._exch.amount_to_precision(symbol, qty / 2))
+                    qty_retry = self._cap_qty(symbol, qty_retry)
+                    if qty_retry > 0:
+                        entry_retry = self._exch.create_order(
+                            symbol=symbol, type="MARKET", side="BUY",
+                            amount=qty_retry, params={"positionSide": "LONG"}
+                        )
+                        results["entry"] = entry_retry
+                        qty = qty_retry
+                        logger.info(">>> 降杠杆5x重试成功: id=%s 数量=%s",
+                                    entry_retry.get("id", "N/A"), qty_retry)
+                    else:
+                        results["error"] = err_msg
+                        return results
+                except Exception as retry_exc:
+                    logger.error("降杠杆重试也失败: %s", retry_exc)
+                    results["error"] = err_msg
+                    return results
+            else:
+                results["error"] = err_msg
+                return results
 
         # 成交后挂止盈止损
         self._挂止盈止损(symbol, qty, stop_loss_price, tp_levels, results)
@@ -334,7 +360,9 @@ class ExchangeClient:
                 result["success"] = True
                 return result
 
-            # 2. 决定买卖方向
+            # 2. 决定买卖方向和持仓方向（LONG-only 系统）
+            if not pos_side or pos_side == "BOTH":
+                pos_side = "LONG"
             side = "SELL" if pos_side == "LONG" else "BUY"
 
             # 3. 精度处理
@@ -452,15 +480,24 @@ class ExchangeClient:
                                 tp_label, symbol, tp_price, exc)
 
         # === 第三步：双端硬核确认 ===
-        try:
-            open_orders = self._exch.fetch_open_orders(symbol)
-            has_sl = any(o.get("type") in ("STOP_MARKET", "STOP") for o in open_orders)
-            if not has_sl:
-                print(f"[FATAL] 双端同步失败！{symbol} 止损单未在交易所生效，执行应急平仓...")
-                results["stop_loss"] = None
-                self.close_position_full(symbol)
-        except Exception as e:
-            print(f"[FATAL_ERROR] 双端审查异常: {e}")
+        has_sl = bool(results.get("stop_loss") and results["stop_loss"].get("id"))
+        if has_sl:
+            logger.info("双端确认: 本地有明确止损订单号 %s，判定生效", results["stop_loss"]["id"])
+        else:
+            # 本地单号丢失时，才通过远程查询兜底
+            try:
+                open_orders = self._exch.fetch_open_orders(symbol)
+                has_sl = any(o.get("type") in ("STOP_MARKET", "STOP") for o in open_orders)
+                if has_sl:
+                    logger.info("双端确认: 本地单号缺失，通过远程追踪到条件单")
+            except Exception as e:
+                logger.warning("双端确认: 远程查询失败: %s", e)
+        if not has_sl:
+            logger.error("【重大风控异常】双端同步失败！%s 止损单未在交易所生效，执行应急平仓", symbol)
+            results["stop_loss"] = None
+            self.close_position_full(symbol)
+        else:
+            logger.info("【安全】双端确认成功，止盈止损单已确权")
 
     def _构建交易所(self):
         exch = ccxt.binanceusdm({

@@ -1,4 +1,4 @@
-"""
+﻿"""
 交易监控面板后端 —— Flask + SocketIO。
 运行方式：
   python -m dashboard.app
@@ -6,6 +6,7 @@
 import json
 import os
 import sys
+import queue
 import time
 
 # 确保项目根目录在 path 中
@@ -18,9 +19,10 @@ from flask_socketio import SocketIO, emit
 
 from config.settings import load_config
 from src.exchange import ExchangeClient
+from src.position_service import PositionService
 from dashboard import trade_store as ts
-from dashboard.yss_scraper import YssScraper
 from dashboard import event_log as el
+from dashboard import asset_history
 import urllib.request
 import urllib.error
 
@@ -30,11 +32,14 @@ socketio = SocketIO(app, cors_allowed_origins="*")
 
 # 全局交易所客户端
 _exchange: ExchangeClient | None = None
+_position_service: PositionService | None = None
 _cfg = None
 
 # ── 日志系统 ──
 _log_buffer: list[dict] = []
 MAX_LOGS = 500
+
+_event_queue: queue.Queue = queue.Queue()
 
 def add_log(level: str, message: str):
     """添加日志并广播到前端"""
@@ -50,79 +55,86 @@ def add_log(level: str, message: str):
     socketio.emit("log", entry)
 
 
+def _event_consumer():
+    """消费进程内事件队列并广播到前端。"""
+    while True:
+        try:
+            entry = _event_queue.get()
+            add_log(entry.get("level", "INFO"), entry.get("message", ""))
+        except Exception:
+            pass
+
+
 def _init_exchange():
-    global _exchange, _cfg
+    global _exchange, _cfg, _position_service
     _cfg = load_config()
     if not _cfg.is_valid:
         add_log("ERROR", "配置无效，请检查 .env 文件")
         return False
     _exchange = ExchangeClient(_cfg)
+    _position_service = PositionService(_exchange)
     add_log("INFO", "交易所客户端初始化完成（测试网模式）")
     return True
 
 
 def _fetch_dashboard_data() -> dict | None:
-    """组装完整仪表盘数据。"""
+    """组装完整仪表盘数据 — 以交易所实时持仓为主，trade_store 补充历史。"""
     if _exchange is None:
-        if not _init_exchange():
-            return None
+        return None
 
     trades = ts.load_all()
 
-    # 从交易所获取当前持仓的实时数据
     try:
-        positions = _exchange._exch.fapiPrivateV2GetPositionRisk() if _exchange else []
+        positions = _position_service.get_open_positions() if _position_service else []
     except Exception as e:
         add_log("WARN", f"获取持仓失败: {e}")
         positions = []
 
-    # 构建持仓实时数据索引（symbol → live data）
     live_map: dict = {}
     for pos in positions:
-        sym = pos.get("symbol", "")
+        sym = pos.get("symbol", "").strip()
         if not sym:
             continue
-        size = float(pos.get("positionAmt", 0) or 0)
+        size = float(pos.get("position_amt", 0) or 0)
         if abs(size) < 0.001:
             continue
         live_map[sym] = {
-            "mark_price": float(pos.get("markPrice", 0) or 0),
-            "unrealized_pnl": float(pos.get("unrealizedProfit") or pos.get("unrealizedPnl", 0) or 0),
-            "margin": float(pos.get("initialMargin") or pos.get("isolatedMargin", 0) or 0),
+            "mark_price": float(pos.get("mark_price", 0) or 0),
+            "unrealized_pnl": float(pos.get("unrealized_pnl", 0) or 0),
+            "margin": float(pos.get("margin", 0) or 0),
             "position_size": size,
-            "entry_price": float(pos.get("entryPrice", 0) or 0),
-            "liquidation_price": float(pos.get("liquidationPrice", 0) or 0),
+            "entry_price": float(pos.get("entry_price", 0) or 0),
+            "liquidation_price": float(pos.get("liquidation_price", 0) or 0),
         }
 
-    # 合并交易记录与实时数据
+    def _norm(s):
+        return s.strip().upper().replace("/","").replace("-","").replace(" ","")
+
     merged = []
+    live_normalized = set()
+
+    for sym, live in live_map.items():
+        d = "LONG" if live["position_size"] > 0 else "SHORT"
+        merged.append({
+            "id": "LIVE_" + sym,
+            "symbol": sym,
+            "direction": d,
+            "entry_price": live["entry_price"],
+            "mark_price": live["mark_price"],
+            "margin": live["margin"],
+            "unrealized_pnl": live["unrealized_pnl"],
+            "status": "OPEN",
+            "position_size": live["position_size"],
+            "liquidation_price": live["liquidation_price"],
+        })
+        live_normalized.add(_norm(sym))
+
     for t in trades:
-        sym = t.get("symbol", "")
-        live = live_map.get(sym, None)
-        row = dict(t)
+        t_sym = t.get("symbol", "") or ""
+        if _norm(t_sym) in live_normalized:
+            continue
+        merged.append(dict(t))
 
-        if live:
-            row["mark_price"] = live["mark_price"]
-            row["unrealized_pnl"] = live["unrealized_pnl"]
-            row["margin"] = live["margin"]
-            row["position_size"] = live["position_size"]
-            row["liquidation_price"] = live["liquidation_price"]
-        else:
-            row["mark_price"] = None
-            row["unrealized_pnl"] = None
-            row["margin"] = None
-            row["position_size"] = None
-            row["liquidation_price"] = None
-
-        merged.append(row)
-
-    # 添加交易所直接持仓
-    for symbol, live in live_map.items():
-        if not any(t.get("symbol") == symbol for t in merged):
-            d = "LONG" if live.get("position_size", 0) > 0 else "SHORT"
-            merged.append({"id":"LIVE_" + symbol, "symbol": symbol, "direction": d, "entry_price": live.get("entry_price"), "mark_price": live.get("mark_price"), "margin": live.get("margin"), "unrealized_pnl": live.get("unrealized_pnl"), "status": "OPEN", "position_size": live.get("position_size"), "liquidation_price": live.get("liquidation_price")})
-
-    # 统计汇总
     total_pnl = sum(
         float(r.get("unrealized_pnl", 0) or 0)
         + float(r.get("realized_pnl", 0) or 0)
@@ -145,7 +157,6 @@ def _fetch_dashboard_data() -> dict | None:
     }
 
 
-# ── Flask 路由 ────────────────────────────────
 
 @app.route("/")
 def index():
@@ -159,7 +170,7 @@ def api_data():
         return jsonify({"error": "初始化失败，请检查 .env 配置"}), 500
     # 同步获取账户余额
     try:
-        acct = _exchange._exch.fapiPrivateV2GetAccount() if _exchange else {}
+        acct = _position_service.get_account_info() if _position_service else {}
         usdt_total = float(acct.get("totalWalletBalance", 0))
         usdt_free = float(acct.get("availableBalance", 0))
         data["account"] = {
@@ -175,10 +186,9 @@ def api_data():
 def api_debug():
     global _exchange
     if _exchange is None:
-        if not _init_exchange():
-            return jsonify({"error": "not init"}), 500
+        return jsonify({"error": "not initialized"}), 500
     try:
-        pos = _exchange._exch.fapiPrivateV2GetPositionRisk() if _exchange else []
+        pos = [p["raw"] for p in _position_service.get_open_positions()] if _position_service else []
         sample = pos[:3] if pos else []
         return jsonify({
             "count": len(pos),
@@ -195,18 +205,17 @@ def api_account():
     """单独获取账户余额"""
     global _exchange
     if _exchange is None:
-        if not _init_exchange():
-            return jsonify({"error": "not initialized"}), 500
+        return jsonify({"error": "not initialized"}), 500
     try:
-        acct = _exchange._exch.fapiPrivateV2GetAccount()
+        acct = _position_service.get_account_info()
         usdt_total = float(acct.get("totalWalletBalance", 0))
         usdt_free = float(acct.get("availableBalance", 0))
         # 计算未实现盈亏
         total_upnl = 0
         try:
-            positions = _exchange._exch.fapiPrivateV2GetPositionRisk()
+            positions = _position_service.get_open_positions()
             for p in positions:
-                upnl = float(p.get("unrealizedProfit", 0) or 0)
+                upnl = float(p.get("unrealized_pnl", 0) or 0)
                 total_upnl += upnl
         except:
             pass
@@ -225,18 +234,17 @@ def api_assets():
     """获取合约账户所有资产余额明细。"""
     global _exchange
     if _exchange is None:
-        if not _init_exchange():
-            return jsonify({"error": "not initialized"}), 500
+        return jsonify({"error": "not initialized"}), 500
     try:
-        bals = _exchange._exch.fapiPrivateV2GetBalance()
+        bals = _position_service.get_asset_balances()
         assets = []
         for b in bals:
-            wb = float(b.get("walletBalance", 0))
+            wb = float(b.get("wallet_balance", 0))
             if wb > 0:
                 assets.append({
                     "asset": b.get("asset", ""),
                     "walletBalance": round(wb, 2),
-                    "availableBalance": round(float(b.get("availableBalance", 0)), 2),
+                    "availableBalance": round(float(b.get("available_balance", 0)), 2),
                 })
         total = sum(a["walletBalance"] for a in assets)
         return jsonify({"assets": assets, "total": round(total, 2)})
@@ -305,10 +313,18 @@ def bgcolor_heartbeat_thread():
 
 
 def _event_poller():
-    import time as _t
     last = 0
+    last_mtime = 0
     while True:
         try:
+            try:
+                current_mtime = os.path.getmtime(el.EVENT_FILE)
+            except Exception:
+                current_mtime = 0
+            if current_mtime == last_mtime:
+                time.sleep(5)
+                continue
+            last_mtime = current_mtime
             evts = el.read_all()
             if len(evts) > last:
                 for e in evts[last:]:
@@ -318,7 +334,27 @@ def _event_poller():
                 last = len(evts)
         except:
             pass
-        _t.sleep(3)
+        time.sleep(5)
+
+
+def _asset_snapshot_loop():
+    """每 60 秒记录一次资产快照到 asset_history.json。"""
+    while True:
+        time.sleep(60)
+        try:
+            acct = _position_service.get_account_info()
+            usdt_total = float(acct.get('totalWalletBalance', 0))
+            usdt_free = float(acct.get('availableBalance', 0))
+            total_upnl = 0.0
+            try:
+                positions = _position_service.get_open_positions()
+                total_upnl = sum(float(p.get('unrealized_pnl', 0) or 0) for p in positions)
+            except Exception:
+                pass
+            asset_history.record_snapshot(usdt_total, usdt_free, total_upnl)
+            add_log("INFO", f"资产快照: 余额={usdt_total:.2f} USDT")
+        except Exception as e:
+            add_log("WARN", f"资产快照失败: {e}")
 
 def main():
     if not _init_exchange():
@@ -330,14 +366,13 @@ def main():
     add_log("INFO", "仪表盘就绪，等待数据加载...")
     print("[仪表盘] 就绪，等待手动刷新 ...")
 
-        # 启动 YSS 信号轮询
-    #_scraper = YssScraper()
-    #_scraper.start()
+    socketio.start_background_task(_event_consumer)
+    socketio.start_background_task(_asset_snapshot_loop)
     socketio.start_background_task(bgcolor_heartbeat_thread)
     socketio.start_background_task(_event_poller)
 
-    print("[仪表盘] 启动 Web 服务: http://127.0.0.1:5000")
-    socketio.run(app, host="127.0.0.1", port=5000, debug=False, allow_unsafe_werkzeug=True)
+    print("[仪表盘] 启动 Web 服务: http://0.0.0.0:5000")
+    socketio.run(app, host="0.0.0.0", port=5000, debug=False, allow_unsafe_werkzeug=True)
 
 
 if __name__ == "__main__":

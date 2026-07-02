@@ -10,6 +10,7 @@ import asyncio
 import logging
 import signal
 import sys
+from rich.logging import RichHandler
 
 from config.settings import load_config
 from src.web_listener import WebSignalListener
@@ -23,14 +24,19 @@ from dashboard import signal_store as ss
 
 def 设置日志(cfg) -> None:
     """配置日志输出。"""
-    handlers: list[logging.Handler] = [logging.StreamHandler(sys.stdout)]
+    rich_handler = RichHandler(rich_tracebacks=True, show_time=True, show_level=True, show_path=False)
+    rich_handler.setFormatter(logging.Formatter("%(name)-20s | %(message)s"))
+    handlers: list[logging.Handler] = [rich_handler]
     if cfg.log_file:
-        handlers.append(logging.FileHandler(cfg.log_file, encoding="utf-8"))
+        fh = logging.FileHandler(cfg.log_file, encoding="utf-8")
+        fh.setFormatter(logging.Formatter(
+            "%(asctime)s | %(name)-24s | %(levelname)-5s | %(message)s",
+            datefmt="%Y-%m-%d %H:%M:%S",
+        ))
+        handlers.append(fh)
 
     logging.basicConfig(
         level=getattr(logging, cfg.log_level.upper(), logging.INFO),
-        format="%(asctime)s | %(name)-24s | %(levelname)-5s | %(message)s",
-        datefmt="%Y-%m-%d %H:%M:%S",
         handlers=handlers,
     )
 
@@ -145,5 +151,7 @@ async def 主异步函数() -> None:
 
 
 if __name__ == "__main__":
-    asyncio.set_event_loop_policy(asyncio.WindowsSelectorEventLoopPolicy())
+    import sys
+    if sys.platform == "win32":
+        asyncio.set_event_loop_policy(asyncio.WindowsSelectorEventLoopPolicy())
     asyncio.run(主异步函数())

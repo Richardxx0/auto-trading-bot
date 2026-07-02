@@ -17,6 +17,8 @@ class RiskManager:
 
     def __init__(self, config: Config):
         self._cfg = config
+        self._max_position_pct = getattr(config, 'max_position_pct', 0.10)
+        self._max_margin_pct = getattr(config, 'max_margin_pct', 0.10)
 
     def calculate(
         self,
@@ -54,25 +56,49 @@ class RiskManager:
         # 原始数量（交易所精度舍入由 exchange 层负责）
         raw_qty = risk_amount / sl_distance
 
-        # 保证金上限截断：每笔最多占可用余额的 10%
-        max_margin = balance_usdt * 0.10
+        # ── 第一道锁：单仓最多占余额 max_position_pct ──
+        max_position_value = balance_usdt * self._max_position_pct
+        max_qty_by_position = max_position_value / entry_price
+
+        # ── 第二道锁：保证金上限 ──
+        max_margin = balance_usdt * self._max_margin_pct
         max_qty_by_margin = max_margin * self._cfg.leverage / entry_price
-        if max_qty_by_margin > 0 and max_qty_by_margin < raw_qty:
-            logger.info('  保证金上限截断: risk_qty=%.2f → margin_qty=%.2f (保证金$%.2f=10%%)',
-                        raw_qty, max_qty_by_margin, max_margin)
-            raw_qty = max_qty_by_margin
+
+        # 取三者最小值
+        qty = min(raw_qty, max_qty_by_position, max_qty_by_margin)
+
+        if qty < raw_qty:
+            logger.info(
+                '  仓位截断: risk_qty=%.4f → position_cap=%.4f → margin_cap=%.4f → final=%.4f '
+                '(资金$%.2f=%.1f%%  保证金$%.2f=%.1f%%)',
+                raw_qty, max_qty_by_position, max_qty_by_margin, qty,
+                max_position_value, self._max_position_pct * 100,
+                max_margin, self._max_margin_pct * 100,
+            )
+
+        # ── 第三道安全锁：硬上限 15%，防止配置错误满仓 ──
+        position_value = qty * entry_price
+        safety_limit = balance_usdt * 0.15
+        if position_value > safety_limit:
+            logger.error(
+                "【安全熔断】position=%.2f USDT 超出上限 %.2f USDT (15%% of balance)，拒绝下单",
+                position_value, safety_limit,
+            )
+            return {"qty": 0.0, "sl": 0.0, "tp": 0.0}
 
         result = {
-            "qty": raw_qty,
+            "qty": qty,
             "sl": sl_price,
             "tp": tp_price,
         }
 
         logger.info(
             "风险计算: 余额=%.2f 风险额=%.4f "
-            "入场=%.8f 止损=%.8f 止盈=%.8f 原始数量=%.6f",
+            "入场=%.8f 止损=%.8f 止盈=%.8f 最终数量=%.6f "
+            "仓位价值=%.2f USDT (占比 %.1f%%)",
             balance_usdt, risk_amount,
-            entry_price, sl_price, tp_price, raw_qty,
+            entry_price, sl_price, tp_price, qty,
+            position_value, position_value / balance_usdt * 100 if balance_usdt > 0 else 0,
         )
 
         return result

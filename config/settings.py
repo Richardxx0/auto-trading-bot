@@ -47,6 +47,14 @@ class Config:
 
     # ── 风控参数 ────
     max_open_positions: int = 9
+    # 仓位健康检查
+    health_timeout_loss_hours: float = 4
+    health_timeout_loss_pct: float = -0.03
+    health_timeout_hours: float = 8
+    # 单仓最多占用余额比例（0.10 = 10%）
+    max_position_pct: float = 0.10
+    # 单仓保证金上限比例（0.10 = 余额的 10% 用于保证金）
+    max_margin_pct: float = 0.10
     trailing_stop_activation_pct: float = 0.03
     trailing_stop_distance_pct: float = 0.02
 
@@ -166,8 +174,10 @@ def load_config(env_file: str | None = None) -> Config:
         risk_per_trade=float(os.environ.get("RISK_PER_TRADE", "0.02")),
         stop_loss_pct=float(os.environ.get("STOP_LOSS_PCT", "0.02")),
         take_profit_pct=float(os.environ.get("TAKE_PROFIT_PCT", "0.04")),
-        leverage=int(os.environ.get("LEVERAGE", "10")),
-        trailing_stop_activation_pct=float(os.environ.get("TRAILING_STOP_ACTIVATION_PCT", "0.012")),
+       leverage=int(os.environ.get("LEVERAGE", "10")),
+        max_position_pct=float(os.environ.get("MAX_POSITION_PCT", "0.10")),
+        max_margin_pct=float(os.environ.get("MAX_MARGIN_PCT", "0.10")),
+       trailing_stop_activation_pct=float(os.environ.get("TRAILING_STOP_ACTIVATION_PCT", "0.012")),
         trailing_stop_distance_pct=float(os.environ.get("TRAILING_STOP_DISTANCE_PCT", "0.002")),
         log_level=os.environ.get("LOG_LEVEL", "INFO"),
         analysis_timeframe=os.environ.get("ANALYSIS_TIMEFRAME", "4h"),

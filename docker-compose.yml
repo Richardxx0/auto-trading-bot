@@ -1,0 +1,32 @@
+services:
+  bot:
+    build: .
+    container_name: auto-trading-bot
+    env_file:
+      - .env
+    volumes:
+      - .:/app
+      - /app/venv
+    restart: unless-stopped
+    command: python main.py
+
+  dashboard:
+    build: .
+    container_name: auto-trading-dashboard
+    env_file:
+      - .env
+    ports:
+      - "5000:5000"
+    volumes:
+      - .:/app
+      - /app/venv
+    restart: unless-stopped
+    command: python -m dashboard.app
+
+  proxy:
+    build: .
+    container_name: auto-trading-proxy
+    ports:
+      - "18080:18080"
+    restart: unless-stopped
+    command: python proxy.py

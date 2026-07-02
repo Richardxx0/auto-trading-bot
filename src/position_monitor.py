@@ -1,4 +1,4 @@
-"""
+﻿"""
 Position Monitor - price milestone state machine.
 
 Logic:
@@ -6,19 +6,26 @@ Logic:
   profit>=10%  -> SL raised to +4%
 """
 import asyncio
+import time
+from dashboard import event_log as el
 import logging
 from core.exchange_service import ExchangeService
 from dashboard import trade_store as ts
+from src.position_service import PositionService
+from src.trade_constants import CloseReason
+from src import dedup_service
 logger = logging.getLogger(__name__)
 
 class PositionMonitor:
-    def __init__(self, exchange_service, config):
+    def __init__(self, exchange_service, config, position_service: PositionService | None = None):
         self._exch_service = exchange_service
         self._exch = exchange_service._exch
         self._cfg = config
+        self._pos_service = position_service or PositionService(self._exch)
         self._running = False
         self._sl_stage: dict[str, int] = {}
         self._checking = False
+        self._last_health_count: int = -1
         self._last_pos_data: dict = {}
 
     async def start(self):
@@ -40,7 +47,7 @@ class PositionMonitor:
         self._checking = True
         try:
             def _fetch():
-                return self._exch._exch.fapiPrivateV2GetPositionRisk()
+                return self._pos_service.get_open_positions()
             positions = await self._exch_service.run(
                 _fetch, timeout=self._exch_service.TIMEOUTS["position"])
         except Exception as exc:
@@ -54,14 +61,14 @@ class PositionMonitor:
 
         for pos in positions:
             symbol = pos.get("symbol", "")
-            cur_qty = float(pos.get("positionAmt", 0) or 0)
-            mark = float(pos.get("markPrice", 0) or 0)
+            cur_qty = abs(float(pos.get("position_amt", 0) or 0))
+            mark = float(pos.get("mark_price", 0) or 0)
             if abs(cur_qty) < 0.001 or mark <= 0:
                 continue
             trade = trade_map.get(symbol)
             if not trade:
                 continue
-            entry = trade.get("entry_price", 0) or float(pos.get("entryPrice", 0) or 0)
+            entry = trade.get("entry_price", 0) or float(pos.get("entry_price", 0) or 0)
             if entry <= 0:
                 continue
 
@@ -70,18 +77,18 @@ class PositionMonitor:
             stage = self._sl_stage.get(symbol, 0)
             new_sl = None
 
-            if current_profit >= 0.20 and stage < 4:
-                new_sl = entry * 1.20
-                self._sl_stage[symbol] = 4
-                logger.info("[RUNNER] %s profit+%.1f%% -> final stage, SL locked at +20%%, cancel take-profits",
-                            symbol, current_profit * 100)
-                try:
-                    await self._exch_service.cancel_all_take_profits(symbol)
-                    ts.update_trade(trade["id"], runner=True)
-                except Exception:
-                    pass
+            # [RUNNER REMOVED] lottery vault disabled, batch TP 50/30/20 only
 
-            elif current_profit >= 0.15 and stage < 3:
+
+
+
+
+
+
+
+
+
+            if current_profit >= 0.15 and stage < 3:
                 new_sl = entry * 1.10
                 self._sl_stage[symbol] = 3
                 logger.info("[TP2-LOCK] %s profit+%.1f%% -> SL raised to +10%%",
@@ -102,58 +109,62 @@ class PositionMonitor:
             if new_sl and new_sl > 0:
                 await self._update_sl(symbol, abs(cur_qty), new_sl, current_profit)
 
-        # cache last known position data for close_trade
-        for pos in positions:
-            s = pos.get("symbol", "")
-            q = float(pos.get("positionAmt", 0) or 0)
-            if abs(q) > 0.001:
-                side = pos.get("positionSide")
-                if not side:
-                    side = "LONG" if q > 0 else "SHORT"
-                self._last_pos_data[(s, side.upper())] = {
-                    "close_price": float(pos.get("markPrice", 0) or 0),
-                    "unrealized_pnl": float(pos.get("unrealizedProfit", 0) or 0),
-                }
+        # ── 仓位健康检查 ─────────────────────────────
+        from datetime import datetime
+        # 仓位利用率日志（仅在变化时打印）
+        cur = len(trades)
+        if cur != self._last_health_count:
+            logger.info("[HEALTH] 当前持仓: %d/%d (变化 %s%d)",
+                        cur, self._cfg.max_open_positions,
+                        "+" if cur > self._last_health_count else "",
+                        cur - self._last_health_count if self._last_health_count >= 0 else 0)
+            self._last_health_count = cur
+        now_t = time.time()
+        pos_by_sym = {p["symbol"]: p for p in positions}
 
-        # ================== 双重防线清理逻辑 ==================
-        # 1. 提取币安实时的持仓镜像，同时记录实时入场价
-        active_positions_info = {}
-        for p in positions:
-            amt = float(p.get("positionAmt", 0) or 0)
-            if abs(amt) > 0.001:
-                side = p.get("positionSide")
-                if not side:
-                    side = "LONG" if amt > 0 else "SHORT"
-                s = p["symbol"]
-                active_positions_info[(s, side.upper())] = float(p.get("entryPrice", 0) or 0)
-
-        # 2. 遍历本地 OPEN 记录，执行方向 + 入场价双重校验
         for t in trades:
-            s = t.get("symbol", "")
-            t_side = (t.get("direction") or t.get("side") or "LONG").upper()
-            t_entry = float(t.get("entry_price", 0) or 0)
+            sym = t.get("symbol", "")
+            if not sym:
+                continue
+            ot = t.get("open_time", "")
+            if not ot:
+                continue
+            try:
+                hold_h = (now_t - datetime.strptime(ot, "%Y-%m-%d %H:%M:%S").timestamp()) / 3600
+            except:
+                continue
 
-            key = (s, t_side)
-            should_cleanup = False
-            reason = ""
+            p = pos_by_sym.get(sym)
+            if not p:
+                continue
+            notional = abs(p["position_amt"]) * p["mark_price"]
+            if notional < 1:
+                continue
+            pnl_pct = p["unrealized_pnl"] / notional
 
-            if key not in active_positions_info:
-                should_cleanup = True
-                reason = "交易所已无持仓"
-            else:
-                binance_entry = active_positions_info[key]
-                if t_entry > 0 and binance_entry > 0:
-                    deviation = abs(binance_entry - t_entry) / t_entry
-                    if deviation > 0.005:
-                        should_cleanup = True
-                        reason = "同向换批次(本地:" + str(t_entry) + " vs 交易所:" + str(binance_entry) + ")"
+            reason = None
+            if hold_h >= self._cfg.health_timeout_loss_hours and pnl_pct <= self._cfg.health_timeout_loss_pct:
+                reason = CloseReason.TIMEOUT_LOSS
+            elif hold_h >= self._cfg.health_timeout_hours:
+                reason = CloseReason.TIMEOUT
 
-            if should_cleanup:
-                ldata = self._last_pos_data.get(key, {})
-                ts.close_trade(t["id"], realized_pnl=ldata.get("unrealized_pnl", 0.0), close_price=ldata.get("close_price", 0.0))
-                if s in self._sl_stage:
-                    del self._sl_stage[s]
-                logger.info("[CLEANUP] 成功清理脱节记录: " + s + " " + t_side + " | 原因: " + reason)
+            if not reason:
+                continue
+            try:
+                self._exch.close_position_full(sym)
+                ts.close_trade(t["id"], realized_pnl=None, close_price=None, close_reason=reason)
+                dedup_service.set_status(sym, "CLOSED")
+                logger.info("[HEALTH] %s: %s 已平仓 (%.1fh, %.2f%%)",
+                            reason, sym, hold_h, pnl_pct * 100)
+                el.write("健康检查", sym, "%s %.1fh %.2f%%%%" % (reason, hold_h, pnl_pct * 100))
+            except Exception as e:
+                logger.warning("[HEALTH] %s 平仓失败，下一轮重试: %s", sym, e)
+
+        if self._pos_service:
+            try:
+                self._pos_service.sync_positions()
+            except Exception as exc:
+                logger.warning("sync_positions failed: " + str(exc))
 
     async def _update_sl(self, symbol, qty, new_sl, pnl_pct):
         try:

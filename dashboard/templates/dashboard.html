@@ -99,6 +99,11 @@
         .blink {
             animation: blink-anim 0.8s ease-in-out infinite;
         }
+    /* 交易表格等宽数字 - 小数点对齐 */
+    .trade-mono {
+        font-family: 'Roboto Mono', 'Courier New', Courier, monospace;
+        font-variant-numeric: tabular-nums;
+    }
     </style>
 </head>
 <body class="min-h-screen p-6 pb-16">
@@ -132,7 +137,7 @@
                     <table class="common-table text-left">
                         <thead>
                             <tr class="border-b table-divide">
-                                <th>币种/方向</th><th>开仓均价</th><th class="text-right">实际数量</th><th class="text-right">标记价格</th><th class="text-right">浮动盈亏</th><th class="text-center w-16">操作</th>
+                                <th class="pl-1">币种/方向</th><th class="text-right pr-6">开仓均价</th><th class="text-right pr-6">实际数量</th><th class="text-right pr-6">标记价格</th><th class="text-right pr-6">浮动盈亏</th><th class="text-center w-16 pr-1">操作</th>
                             </tr>
                         </thead>
                         <tbody id="position-table-body" class="divide-y table-divide">
@@ -241,6 +246,12 @@ function loadDashboard() {
         updateSummary(data.summary);
         updateAccount(data.account);
         renderPositionsTable();
+        // 更新资产变化图表
+        if (data.asset_history && data.asset_history.length > 1) {
+            var labels = data.asset_history.map(function(r){ return r.time.slice(5, 16); });
+            var values = data.asset_history.map(function(r){ return Number(r.equity); });
+            updateTrendData(labels, values);
+        }
         // 核心修复：只有在外部真实资产未注入时，才降级使用本地计算持仓，防止抢占覆盖
         if(!window.hasExternalStructureData) {
             updateCharts();
@@ -268,7 +279,8 @@ function updateSummary(s) {
 
 function updateAccount(a) {
     if (!a) return;
-    $('stat-equity').textContent = Number(a.total_balance || 0).toFixed(2);
+    var eq = Number(a.total_balance || 0) + Number(a.total_unrealized_pnl || 0);
+    $('stat-equity').textContent = eq.toFixed(2);
     $('stat-balance').textContent = Number(a.available_balance || 0).toFixed(2);
 }
 
@@ -288,13 +300,13 @@ function renderPositionsTable() {
         var qty = Number(p.position_size || p.qty || 0);
         var upnl = Number(p.unrealized_pnl || 0);
         var pnlColor = upnl >= 0 ? '#10b981' : '#f43f5e';
-        var pnlSign = upnl >= 0 ? '+' : '';
+        var pnlDisplay = p.unrealized_pnl_display || (upnl >= 0 ? '+' : '') + upnl.toFixed(2);
         html += '<tr class="row-hover">' +
-            '<td>' + p.symbol + ' <span style="font-size:10px;background:' + dirColor + '33;color:' + dirColor + ';padding:0 6px;border-radius:4px">' + dirText + '</span></td>' +
-            '<td class="font-mono">' + num(p.entry_price) + '</td>' +
-            '<td class="text-right font-mono" style="color:#f59e0b">' + num(qty, 4) + '</td>' +
-            '<td class="text-right font-mono">' + num(p.mark_price) + '</td>' +
-            '<td class="text-right font-mono" style="color:' + pnlColor + '">' + pnlSign + upnl.toFixed(2) + '</td>' +
+            '<td class="pl-1">' + p.symbol + '<span style="font-size:10px;margin-left:8px;background:' + dirColor + '33;color:' + dirColor + ';padding:1px 7px;border-radius:4px;font-weight:600">' + dirText + '</span></td>' +
+            '<td class="text-right trade-mono pr-6">' + num(p.entry_price) + '</td>' +
+            '<td class="text-right trade-mono pr-6" style="color:#f59e0b">' + num(qty, 4) + '</td>' +
+            '<td class="text-right trade-mono pr-6">' + num(p.mark_price) + '</td>' +
+            '<td class="text-right trade-mono pr-6" style="color:' + pnlColor + '">' + pnlDisplay + '</td>' +
             '<td class="text-center"><button onclick="closePosition(\'' + p.symbol + '\')" style="color:#f43f5e;font-size:11px;font-weight:700;background:none;border:none;cursor:pointer">\u5e73\u4ed3</button></td>' +
         '</tr>';
     }

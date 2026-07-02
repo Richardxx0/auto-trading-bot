@@ -18,6 +18,7 @@ signals.json
 venv/
 # Generated runtime data
 trades.json
+asset_history.json
 
 # Log files (auto-generated)
 logs/*.log
@@ -37,3 +38,16 @@ _
 
 # Log directory
 logs/
+
+# VPS / deploy / temp scripts
+_deploy_*.py
+_vps_*.py
+_chk_*.py
+_p1_*.py
+_px.py
+boot.*
+proxy.log
+
+# Proxy / tunnel launchers
+start_proxy.*
+start_tunnel.*

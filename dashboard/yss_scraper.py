@@ -37,19 +37,6 @@ class YssScraper:
     def stop(self):
         self._running = False
 
-    def _sleep_until_next_poll(self):
-        now = _dt.datetime.now()
-        next_min = ((now.minute // 15) + 1) * 15
-        next_hour = now.hour
-        if next_min >= 60:
-            next_min = 0
-            next_hour += 1
-        next_time = now.replace(hour=next_hour % 24, minute=next_min, second=30, microsecond=0)
-        if next_time <= now:
-            next_time += _dt.timedelta(days=1)
-        delay = (next_time - now).total_seconds()
-        time.sleep(delay)
-
     def _run(self):
         if not self._login():
             return
@@ -66,7 +53,7 @@ class YssScraper:
                     logger.info("Token 失效，重新登录...")
                     if not self._login():
                         break
-            self._sleep_until_next_poll()
+            time.sleep(900)
 
     def _login(self) -> bool:
         try:
